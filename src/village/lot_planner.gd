@@ -1039,6 +1039,20 @@ static func lot_rule(cls: StringName, spec: VillageSpec) -> Dictionary:
 		rule = rule.duplicate()
 		rule.merge(ISLAND_RULE, true)
 		return rule
+	if spec != null and cls in [&"townhouse", &"shop", &"cottage", &"farm"] and not spec.compact_display:
+		var character: Dictionary = spec.ground_character()
+		if character.has("fire_m") or character.has("setback_m"):
+			# VTER-VISUAL-CHARACTER: a packed place (Manarola's stack, a bastide's
+			# frontage) says how close its neighbours stand. Only the ground that
+			# carries these keys changes; nothing else reads them.
+			rule = rule.duplicate()
+			var setback: float = float(character.get("setback_m", rule["use"]))
+			rule["use"] = setback
+			rule["set_min"] = minf(float(rule["set_min"]), setback)
+			rule["set_max"] = maxf(minf(float(rule["set_max"]), setback + 1.5), setback)
+			rule["fire"] = float(character.get("fire_m", rule["fire"]))
+			rule["yard"] = minf(float(rule["yard"]), 1.0)
+			return rule
 	if spec == null or not spec.compact_display:
 		return rule
 	rule = rule.duplicate()

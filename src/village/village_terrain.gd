@@ -38,6 +38,13 @@ var water_level_m := NAN
 ## Where the ground came from, for the plan's notes: "inline", a file name,
 ## "sampler", "flat".
 var source := ""
+## What the place is LIKE, as its baker or caller knows it (VTER-VISUAL-CHARACTER).
+## Optional and empty on every grid that does not say. Keys, all optional:
+## `culture` (a VillageSpec.CULTURES name; applied only to a spec left at the
+## default culture), `house_style` (a HouseSpec style for the houses and shops),
+## `storeys_min` (int), `fire_m` (clear metres between neighbours) and
+## `setback_m` (door side to road edge). See docs/VILLAGE_TERRAIN.md.
+var character := {}
 ## Set only on a VILLAGE-FRAME view (`sited_view`, VTER-SITING): the caller's
 ## ground this view was resampled from, and where the village frame lies on
 ## it -- a village point p is the caller's point `site_anchor + p.rotated(site_yaw)`.
@@ -130,6 +137,8 @@ static func from_dict(d: Dictionary, base_dir := "") -> VillageTerrain:
 	if t.cols * t.rows > SAMPLES_MAX:
 		t._errors.append("%d x %d samples exceeds %d" % [t.cols, t.rows, SAMPLES_MAX])
 		return t
+	if d.get("character", null) is Dictionary:
+		t.character = (d["character"] as Dictionary).duplicate(true)
 	if d.has("water_level_m") and d["water_level_m"] != null:
 		if not _num(d["water_level_m"]):
 			t._errors.append("water_level_m must be a number or null")

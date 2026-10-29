@@ -286,6 +286,22 @@ func valid() -> bool:
 	return errors().is_empty()
 
 
+## The character the ground carries (VTER-VISUAL-CHARACTER), or {}.
+func ground_character() -> Dictionary:
+	if terrain != null and terrain.valid():
+		return terrain.character
+	return {}
+
+
+## The culture the buildings are asked for: the ground's own when the caller
+## left the culture at the default and the ground names one.
+func effective_culture() -> StringName:
+	var named := StringName(String(ground_character().get("culture", "")))
+	if culture == &"english" and named in CULTURES:
+		return named
+	return culture
+
+
 ## Fills every derived field from the seven inputs. Pure given (population,
 ## culture, purpose, wealth, enclosure, water, seed): calling it twice on two
 ## specs built from the same inputs leaves both with identical derived

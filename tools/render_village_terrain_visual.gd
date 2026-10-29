@@ -21,6 +21,7 @@ func _init() -> void:
 		args = PackedStringArray(["manarola", "hallstatt", "monpazier"])
 	for site in args:
 		var ground := VillageTerrain.from_file("res://tests/fixtures/terrain/real30/%s.json" % site)
+		VillageCharacterCheck.apply(ground, site)
 		if not ground.valid():
 			print("VISUAL_SKIP ", site)
 			continue

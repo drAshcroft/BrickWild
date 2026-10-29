@@ -91,7 +91,12 @@ const MONUMENTS := ["great-tomb", "ziggurat"]
 ## rows, then the lord's house. Order is stable given the same spec.
 static func programme(spec: VillageSpec) -> Array[BuildingRequest]:
 	var out: Array[BuildingRequest] = []
-	var styles: Dictionary = CULTURE_STYLES.get(spec.culture, CULTURE_STYLES[&"english"])
+	var styles: Dictionary = CULTURE_STYLES.get(spec.effective_culture(), CULTURE_STYLES[&"english"])
+	var character: Dictionary = spec.ground_character()
+	var house_style := StringName(String(character.get("house_style", "")))
+	if house_style != &"" and HouseSpec.STYLES.has(house_style):
+		styles = styles.duplicate()
+		styles["house"] = house_style
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("programme|%d" % spec.seed)
 
@@ -385,6 +390,7 @@ static func _make_house(spec: VillageSpec, styles: Dictionary, rng: RandomNumber
 	if forced_style != &"":
 		style = forced_style
 	var storeys := _storeys_for(spec.wealth, rng)
+	storeys = maxi(storeys, int(spec.ground_character().get("storeys_min", 0)))
 	var w: float = lerp(7.0, 10.0, clampf(spec.wealth, 0.0, 1.0))
 	var l: float = lerp(9.0, 13.0, clampf(spec.wealth, 0.0, 1.0))
 	var t: float = 0.5 if spec.households <= 1 else 1.0 - float(i) / float(spec.households - 1)

@@ -2349,3 +2349,82 @@ Open (VTER-GROUND-SEAM): one seam sample in Hallstatt is open 0.13 m of a
 Monpazier (0.20 m, (-36.7, 20.9)) has two ground layers. They are listed as
 `known` ceilings in the suite's CASES (a warning each; a fixed one must be
 taken off the list, a second one fails).
+
+## The character of a real site (VTER-VISUAL-CHARACTER)
+
+The three real villages looked alike: 11-12 Norman timber houses with lawn
+between them. Scoped, as the owner's bounded-acceptance rule asks, to three
+checkable traits per site. A photo is a guide, not a target.
+
+**What existed (surveyed first).**
+
+* House styles (`HouseSpec.STYLES`): cottage, farmhouse, townhouse, longhall,
+  witch_hut, rich, **mediterranean** (limewash, pantiles, loggia), asian,
+  african, thatch_cottage, roundhouse, pueblo. No alpine chalet, no stone
+  house.
+* A village picks a style through `VillageProgrammer.CULTURE_STYLES[culture]`
+  (`mediterranean`, `alpine` -> farmhouse, `frankish` -> farmhouse/townhouse).
+  Nothing derived the culture from the ground: a spec was `english` unless the
+  caller said otherwise, so every real site was Norman.
+* Density is the lot class: `LOT_RULES` (`use` setback, `fire` clear metres
+  between neighbours). A trade `farmer` house is a `farm` lot (fire gap 6 m,
+  setback 7 m), which is what spread the real sites (Manarola's nearest-neighbour
+  median was 7.2 m). Storeys come from wealth only (1 or 2).
+* Arcades: `ShopPlanner` has a market hall with an open arcade, but the village
+  programme never places one. A bastide's arcaded square would need that.
+
+**The traits** (`qa/village_character_check.gd`, measured on the plan;
+population 40, seed 1, the form the planner chooses, the render's village).
+
+| Site | Trait 1: style | Trait 2: storeys | Trait 3: frontage | Measured |
+|---|---|---|---|---|
+| Manarola (water form) | >= 90 % of dwellings `mediterranean` | median house storeys >= 3 | >= 90 % of dwellings have a neighbour within 2.0 m | 11/11 mediterranean, 3 storeys, 10 of 11 within 2.0 m (median 1.7 m) |
+| Hallstatt (dispersed) | >= 90 % `townhouse` (tall close-studded timber; the nearest to alpine) | median >= 2 | >= 50 % within 3.5 m | 10/10, 2 storeys, 5 of 10 (median 5.7 m) |
+| Monpazier (planted) | >= 90 % `townhouse` | median >= 2 | >= 60 % within 3.0 m | 11/11, 2 storeys, 7 of 11 (median 2.5 m) |
+
+Default (Norman) spec on the same ground: cottage 7 + townhouse 4, one storey,
+nearest-neighbour median 7.2 m (Manarola): it fails style and storeys on all
+three, and is the failing control.
+
+**How it is wired.** `VillageTerrain.character` (optional dictionary, also the
+`character` key of a grid file) carries `culture`, `house_style`, `storeys_min`,
+`fire_m`, `setback_m`. `VillageSpec.effective_culture()` takes the ground's
+culture only when the spec was left at `english`; the programmer then asks for
+that culture's style (or `house_style`) and at least `storeys_min` storeys;
+`VillageLotPlanner.lot_rule` gives town, shop, cottage and farm lots the
+character's `fire_m` and `setback_m`. A ground with no `character` plans
+exactly as before. The three sites' values live in
+`tests/fixtures/terrain/real30/character.json`, NOT in the grid files, because
+`shore`, `hillside`, `crossroads` and `vstepswalk` read those grids and keep
+their layouts (putting it in the grid files lost Manarola's stair street in
+`lane:village-terrain`). `VillageCharacterCheck.apply(ground, site)` loads it;
+the render (`tools/render_village_terrain_visual.gd`), the walk
+(`visualqa/walk --village-terrain=`) and `vcharacter` call it.
+
+**Check.** Suite `vcharacter` (12 checks, about 6 minutes: three plans of 40
+people): per site the three traits hold, and the same ground with no character
+fails style and storeys (programme only, no layout). It is not in a lane: it is
+over the five-minute cap. Run `-- vcharacter` after changing a trait or the
+lot rules (`CHARACTER_SITE=manarola` for one site).
+
+**Not done, filed as P3 follow-ups.** A true alpine chalet style (shingle,
+low pitch, balconies) for Hallstatt and a stone-walled style for Monpazier
+(`townhouse` stands in); the continuous lakeside strip (Hallstatt plans as
+`dispersed`, so only half its houses touch a neighbour; the shore form would be
+the place); Monpazier's arcaded square (the market-hall arcade is not
+placed by the village programme); deriving `character` from the site data a
+baker writes (region, latitude) rather than a table.
+
+![Manarola with its character](images/vter_visual/manarola_character.jpg)
+![Hallstatt with its character](images/vter_visual/hallstatt_character.jpg)
+![Monpazier with its character](images/vter_visual/monpazier_character.jpg)
+
+Honest read of the renders (overviews, 2026-10-29). Manarola reads differently
+at once: white plaster, terracotta pantiles, three storeys, rows with 1-2 m
+between them; it is a Mediterranean village, though still on a flat plateau, not
+Manarola's cliff stack. Hallstatt is taller slate-roofed half-timber in two
+tight clusters 100 m apart on the slope, so it reads as a different village but
+not as a lakeside strip. Monpazier is the weakest change: the grid and a
+church are right and the houses are taller and closer, but they are still
+black-and-white timber, so a viewer who knows the Norman set would call it the
+same family. Needs the stone and chalet styles filed above.

@@ -1,0 +1,6 @@
+{
+ "about": "VTER-VISUAL-CHARACTER: what each real site is LIKE, in the VillageTerrain.character vocabulary (culture, house_style, storeys_min, fire_m, setback_m). Not in the grid files: every other suite reads those grids and must keep its layout. Applied by VillageCharacterCheck.apply() for the render, the walk and `vcharacter`; a consumer sets terrain.character, or the same key in its grid JSON.",
+ "manarola": {"culture": "mediterranean", "storeys_min": 3, "fire_m": 1.0, "setback_m": 0.6},
+ "hallstatt": {"culture": "alpine", "house_style": "townhouse", "storeys_min": 2, "fire_m": 1.0, "setback_m": 0.6},
+ "monpazier": {"culture": "frankish", "house_style": "townhouse", "storeys_min": 2, "fire_m": 1.0, "setback_m": 0.6}
+}

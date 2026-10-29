@@ -848,7 +848,7 @@ func _generate_terrain_village() -> void:
 		path = "res://tests/fixtures/terrain/%s.json" % _terrain_name
 		if not FileAccess.file_exists(path):
 			path = "res://tests/fixtures/terrain/real30/%s.json" % _terrain_name
-	var ground := VillageTerrain.from_file(path)
+	var ground := VillageCharacterCheck.apply(VillageTerrain.from_file(path), _terrain_name)
 	if not ground.valid():
 		_status.text = "No terrain %s (%s)." % [_terrain_name, path]
 		_busy = false
