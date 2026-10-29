@@ -168,6 +168,46 @@ plan cell reshuffles unrelated medians, so the relief term is not kept. The
 yardstick fix is the strict improvement kept. Left for a gate that scores whole
 plans, not one metric: hillside span stays 6.75-9.2 m against p10 14.4.
 
+## Relief tie-break under the three-state verdict, and the population test (VTER-REAL-VERTICAL, 2026-10-29)
+
+Method: `tools/probe_realism_seeds.gd -- cache=<dir> [pop=N] [only=a,b] 4242 101 202`
+plans into any cache dir; `tools/judge_cache.gd -- cache=<dir> out=<states.json>
+base=<states.json> metric=elev_span_m` judges a cache in seconds and diffs every
+cell's state against a saved one. Planning 42 plans takes about 40 min on a
+loaded host (Naujaat 9 min, Civita 10 min), so one candidate frame is one
+iteration; a cached baseline from unchanged code is identical to the committed
+one (120 in, 61 unsure, 26 out on the cache; the gate's 122 differs by the
+bootstrap only).
+
+Baseline elev_span_m (median [90 % interval], real band): hillside LOW 10.5
+[2.8-13.6] vs 14.4-73.0; valley UNSURE 2.8 [1.7-21.1] vs 6.0-70.2; crest UNSURE
+10.4 [1.3-10.6] vs 4.35-37.4; coast UNSURE 0.6 [0.6-4.3] vs 1.28-59.6; lake LOW
+0.9 [0.5-1.3] vs 1.81-46.9; arid LOW 1.3 [0.5-1.6] vs 1.63-18.2 (lowland, island
+and polar are in).
+
+Relief term retried (lattice p5-p95 span below 3 m costs 3, plus a 6x penalty on
+median node slope over 3 %; the same span term on the shore frame): hillside LOW
+10.8, valley UNSURE 2.8, crest UNSURE 5.2, coast UNSURE 0.9, lake LOW 1.0, arid
+LOW 1.3. **No cell moved to in; 119 in / 62 unsure / 26 out against 120 / 61 / 26.**
+Side effects: 4 in cells became unsure on unrelated metrics (hillside
+orientation_order and dead_end_ratio, valley slope_median and worship_centrality,
+crest slope_median, island nn_median and frontage_aligned, arid body_elev_pctile,
+polar intersections) and 3 unsure cells went decisively out (hillside
+frontage_aligned high, coast body_share and coverage high). No in cell went out,
+but the term is not kept: it buys nothing. The siting cannot make relief the
+ground does not have: the arid, lake and coast samples stand on flat DEM cells
+(Bakel, Zygi, Tofta, Lelu span 0.5-1.7 m wherever the frame is put).
+
+Population test (50 -> 150 people, seed 4242, the unchanged siting): Koshi 0.3 ->
+7.3 m, Aoloau 9.2 -> 36.1, Posillipo 16.2 -> 26.5, Vijayapuri North 1.3 -> 3.2,
+Cayumba 21.3 -> 16.5; but the flat grounds do not move: Bakel 1.7 -> 1.4, Zygi
+0.5 -> 0.7, Lelu 0.6 -> 0.5. So population IS the cause for sloped sites (hillside,
+valley, crest: a 50-person village is a hamlet on a 150 m site, a real mapped
+village is several times that) and is NOT the cause for lake, arid and coast,
+whose cells are limited by flat ground. `vrealism` plans at `POPULATION` 50;
+`VillageRealismSuite.population` is now a static var so a probe can ask 150.
+Moving the gate to 150 would triple its 22 min; left open.
+
 <!-- realism:begin -->
 ### In-band share by stratum
 

@@ -26,6 +26,8 @@ const WORLD90 := "res://tests/fixtures/terrain/world90/"
 const BASELINE := "res://tests/fixtures/settlements/realism_baseline.json"
 const DOC := "res://docs/VILLAGE_REALISM.md"
 const POPULATION := 50
+## the population a plan is asked for; tools/probe_realism_seeds.gd pop=N overrides it
+static var population := POPULATION
 const SEED := 4242
 const MIN_REAL := 5              ## fewer real members than this: the cell is not judged
 const TARGET_SHARE := 0.75       ## the acceptance bar, reported, not gated
@@ -182,16 +184,16 @@ static func _plan(site: Dictionary, path: String, seed_v: int = SEED) -> Village
 	elif in_stratum("coast", site):
 		water = "coast"
 	var purpose := "farming" if water == "none" else "fishing"
-	var key := purpose + "/" + water + "/" + str(seed_v)
+	var key := purpose + "/" + water + "/" + str(seed_v) + "/" + str(population)
 	var spec := VillageSpec.new(seed_v)
-	spec.population = POPULATION
+	spec.population = population
 	spec.purpose = StringName(purpose)
 	spec.water = StringName(water)
 	spec.terrain = ground
 	spec.generate(seed_v)
 	if not _jobs.has(key):
 		var flat := VillageSpec.new(seed_v)
-		flat.population = POPULATION
+		flat.population = population
 		flat.purpose = StringName(purpose)
 		flat.water = StringName(water)
 		flat.generate(seed_v)
