@@ -29,6 +29,11 @@ const POPULATION := 50
 const SEED := 4242
 const MIN_REAL := 5              ## fewer real members than this: the cell is not judged
 const TARGET_SHARE := 0.75       ## the acceptance bar, reported, not gated
+## VTER-REAL-SAMPLE: each sample site is planned under every seed, and a cell is
+## judged on the bootstrap interval of its median, not on the point.
+const SEEDS: Array[int] = [4242, 101, 202]
+const BOOT := 400                ## bootstrap resamples per cell
+const CONF := 0.90               ## two-sided interval of the median
 
 const STRATA: Array[String] = ["lowland", "hillside", "valley", "crest", "coast", "lake", "island", "arid", "polar"]
 
@@ -65,44 +70,32 @@ static func run() -> SuiteResult:
 		res.fail("the world set reads %d usable sites, wants 100+" % sites.size())
 		return res
 	var ground := _ground_index()
-	var cells := {}                      # stratum -> metric -> {"real": [..], "gen": [..]}
-	for st in STRATA:
-		cells[st] = {}
-		for m in METRICS:
-			cells[st][m] = {"real": [], "gen": []}
-	for s in sites:
-		for st in STRATA:
-			if in_stratum(st, s):
-				for m in METRICS:
-					var v = s["morph"].get(m)
-					if v != null:
-						cells[st][m]["real"].append(float(v))
 	var plans_by_stratum := {}
 	for st in STRATA:
 		plans_by_stratum[st] = []
+	var shapes: Array = []               # {"name", "seed", "shape"}
 	for name in SAMPLE:
 		var site := _site(sites, name)
 		res.checked += 1
 		if site.is_empty() or not ground.has(name):
 			res.fail("sample site %s is not in the set with a world90 grid" % name)
 			continue
-		var t1 := Time.get_ticks_msec()
-		var plan := _plan(site, ground[name])
-		var secs := (Time.get_ticks_msec() - t1) / 1000.0
-		if plan == null or plan.buildings.is_empty():
-			res.fail("%s: no plan on its own ground" % name)
-			continue
-		var shape := VillageShape.measure(plan)
 		var member := []
 		for st in STRATA:
 			if in_stratum(st, site):
 				member.append(st)
 				plans_by_stratum[st].append(name)
-				for m in METRICS:
-					if shape.get(m) != null:
-						cells[st][m]["gen"].append(float(shape[m]))
-		res.note("%s: form %s, %d buildings, %.1f s, strata %s" % [name, plan.spec.form,
-			plan.buildings.size(), secs, ",".join(member)])
+		for sd in SEEDS:
+			var t1 := Time.get_ticks_msec()
+			var plan := _plan(site, ground[name], sd)
+			var secs := (Time.get_ticks_msec() - t1) / 1000.0
+			if plan == null or plan.buildings.is_empty():
+				res.fail("%s seed %d: no plan on its own ground" % [name, sd])
+				continue
+			shapes.append({"name": name, "seed": sd, "shape": VillageShape.measure(plan)})
+			res.note("%s seed %d: form %s, %d buildings, %.1f s, strata %s" % [name, sd, plan.spec.form,
+				plan.buildings.size(), secs, ",".join(member)])
+	var cells := build_cells(sites, shapes)
 	var table := judge(cells)
 	_report(res, table, plans_by_stratum, sites.size())
 	_gate(res, table)
@@ -178,7 +171,7 @@ static func _ground_index() -> Dictionary:
 
 # ------------------------------------------------------------- planning
 
-static func _plan(site: Dictionary, path: String) -> VillagePlan:
+static func _plan(site: Dictionary, path: String, seed_v: int = SEED) -> VillagePlan:
 	var ground := VillageTerrain.from_file(path)
 	if ground == null or not ground.valid():
 		return null
@@ -189,27 +182,57 @@ static func _plan(site: Dictionary, path: String) -> VillagePlan:
 	elif in_stratum("coast", site):
 		water = "coast"
 	var purpose := "farming" if water == "none" else "fishing"
-	var key := purpose + "/" + water
-	var spec := VillageSpec.new(SEED)
+	var key := purpose + "/" + water + "/" + str(seed_v)
+	var spec := VillageSpec.new(seed_v)
 	spec.population = POPULATION
 	spec.purpose = StringName(purpose)
 	spec.water = StringName(water)
 	spec.terrain = ground
-	spec.generate(SEED)
+	spec.generate(seed_v)
 	if not _jobs.has(key):
-		var flat := VillageSpec.new(SEED)
+		var flat := VillageSpec.new(seed_v)
 		flat.population = POPULATION
 		flat.purpose = StringName(purpose)
 		flat.water = StringName(water)
-		flat.generate(SEED)
+		flat.generate(seed_v)
 		_jobs[key] = VillageLotPlanner.measure_all(VillageProgrammer.programme(flat))
 	return VillageLotPlanner.plan_measured(spec, _jobs[key])
 
 
 # ------------------------------------------------------------- judging
 
-## cells -> {stratum: {metric: {n_real, n_gen, p10, p90, gen, state}}}; state
-## is "in", "low", "high" or "na" (too few real members or no generated value).
+## {stratum: {metric: {"real": [..], "gen": [..]}}} from the real sites and the
+## measured plans ({"name", "shape"} rows; one row per site and seed).
+static func build_cells(sites: Array, shapes: Array) -> Dictionary:
+	var cells := {}
+	for st in STRATA:
+		cells[st] = {}
+		for m in METRICS:
+			cells[st][m] = {"real": [], "gen": []}
+	for s in sites:
+		for st in STRATA:
+			if in_stratum(st, s):
+				for m in METRICS:
+					var v = s["morph"].get(m)
+					if v != null:
+						cells[st][m]["real"].append(float(v))
+	for row in shapes:
+		var site := _site(sites, String(row["name"]))
+		for st in STRATA:
+			if site.is_empty() or not in_stratum(st, site):
+				continue
+			for m in METRICS:
+				if row["shape"].get(m) != null:
+					cells[st][m]["gen"].append(float(row["shape"][m]))
+	return cells
+
+
+## cells -> {stratum: {metric: {n_real, n_gen, p10, p90, gen, lo, hi, state}}}.
+## `gen` is the median of the plans, [lo, hi] the bootstrap interval of that
+## median. state is "in" (interval wholly inside the real p10-p90), "low" or
+## "high" (interval wholly outside, on that side), "unsure" (the interval
+## straddles an edge: the sample cannot tell, and that is not a pass) or "na"
+## (too few real members or no generated value).
 static func judge(cells: Dictionary) -> Dictionary:
 	var out := {}
 	for st in cells:
@@ -217,18 +240,54 @@ static func judge(cells: Dictionary) -> Dictionary:
 		for m in cells[st]:
 			var real: Array = cells[st][m]["real"]
 			var gen: Array = cells[st][m]["gen"]
-			var row := {"n_real": real.size(), "n_gen": gen.size(), "p10": null, "p90": null, "gen": null, "state": "na"}
+			var row := {"n_real": real.size(), "n_gen": gen.size(), "p10": null, "p90": null,
+				"gen": null, "lo": null, "hi": null, "state": "na"}
 			if real.size() >= MIN_REAL:
 				row["p10"] = _pct(real, 10.0)
 				row["p90"] = _pct(real, 90.0)
 			if not gen.is_empty():
 				row["gen"] = _pct(gen, 50.0)
+				var iv := median_interval(gen)
+				row["lo"] = iv.x
+				row["hi"] = iv.y
 			if row["p10"] != null and row["gen"] != null:
-				row["state"] = classify(float(row["gen"]), float(row["p10"]), float(row["p90"]))
+				row["state"] = classify_interval(float(row["lo"]), float(row["hi"]), float(row["p10"]), float(row["p90"]))
+				row["point"] = classify(float(row["gen"]), float(row["p10"]), float(row["p90"]))
 			out[st][m] = row
 	return out
 
 
+## The bootstrap interval (CONF) of the median of `values`, resampling plans
+## with a fixed seed so the verdict is a pure function of the sample.
+static func median_interval(values: Array) -> Vector2:
+	if values.size() < 2:
+		var v := float(values[0])
+		return Vector2(v, v)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20261029
+	var meds: Array = []
+	var n := values.size()
+	for _b in range(BOOT):
+		var pick: Array = []
+		for _i in range(n):
+			pick.append(values[rng.randi() % n])
+		meds.append(_pct(pick, 50.0))
+	meds.sort()
+	var tail := (1.0 - CONF) / 2.0 * 100.0
+	return Vector2(_pct(meds, tail), _pct(meds, 100.0 - tail))
+
+
+static func classify_interval(lo: float, hi: float, p10: float, p90: float) -> String:
+	if hi < p10 - 1e-9:
+		return "low"
+	if lo > p90 + 1e-9:
+		return "high"
+	if lo >= p10 - 1e-9 and hi <= p90 + 1e-9:
+		return "in"
+	return "unsure"
+
+
+## The point verdict (the old gate): the median alone against the band.
 static func classify(v: float, p10: float, p90: float) -> String:
 	# a hair of slack: the bands are rounded to the fixture's decimals
 	if v < p10 - 1e-9:
@@ -251,26 +310,37 @@ static func cell_key(st: String, m: String) -> String:
 	return st + "/" + m
 
 
-## {key: true/false} for every judged cell.
+## {key: true / false / "unsure"} for every judged cell: true is in, false is
+## out beyond the noise, "unsure" is neither.
 static func states(table: Dictionary) -> Dictionary:
 	var out := {}
 	for st in table:
 		for m in table[st]:
 			var s: String = table[st][m]["state"]
-			if s != "na":
-				out[cell_key(st, m)] = (s == "in")
+			if s == "na":
+				continue
+			out[cell_key(st, m)] = true if s == "in" else ("unsure" if s == "unsure" else false)
 	return out
 
 
-## Regressions: baseline cells that were in and are now out, and baseline
-## cells that vanished.
+## Regressions: baseline cells that were in and are now out beyond the noise,
+## and baseline cells that vanished. An "unsure" cell is reported by `doubts`,
+## never failed and never counted as in.
 static func regressions(baseline: Dictionary, now: Dictionary) -> Array[String]:
 	var out: Array[String] = []
 	for k in baseline:
 		if not now.has(k):
 			out.append("%s: in the baseline, no longer judged" % k)
-		elif bool(baseline[k]) and not bool(now[k]):
-			out.append("%s: was inside the real p10-p90, now outside" % k)
+		elif bool(baseline[k]) and now[k] is bool and not now[k]:
+			out.append("%s: was inside the real p10-p90, now outside beyond the sampling noise" % k)
+	return out
+
+
+static func doubts(baseline: Dictionary, now: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	for k in baseline:
+		if bool(baseline[k]) and now.get(k) is String:
+			out.append(k)
 	return out
 
 
@@ -286,20 +356,27 @@ static func _gate(res: SuiteResult, table: Dictionary) -> void:
 	if OS.get_environment("BRICK_WILD_REALISM_UPDATE") != "1":
 		for line in regressions(base["cells"], now):
 			res.fail(line)
+		for k in doubts(base["cells"], now):
+			res.note("UNSURE %s: in the baseline, the sample cannot place it now" % k)
 	var n_in := 0
+	var n_unsure := 0
 	for k in now:
-		if now[k]:
+		if now[k] is String:
+			n_unsure += 1
+		elif now[k]:
 			n_in += 1
-	res.note("cells: %d judged, %d inside (%.0f %%), bar %.0f %%" % [now.size(), n_in,
-		100.0 * n_in / maxi(1, now.size()), 100.0 * TARGET_SHARE])
+	res.note("cells: %d judged, %d inside (%.0f %%), %d unsure, bar %.0f %%" % [now.size(), n_in,
+		100.0 * n_in / maxi(1, now.size()), n_unsure, 100.0 * TARGET_SHARE])
 
 
-## The gate must be able to fail: a baseline cell that was in, now out.
+## The gate must be able to fail: a baseline cell that was in, now out; and a
+## metric shifted far outside its band is out beyond the noise, never unsure.
 static func _control(res: SuiteResult) -> void:
 	res.checked += 1
-	var fake_cells := {"s": {"m": {"real": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0], "gen": [2.0]}}}
+	var real := [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+	var fake_cells := {"s": {"m": {"real": real, "gen": [2.0, 2.5, 3.0]}}}
 	var base_state := states(judge(fake_cells))
-	fake_cells["s"]["m"]["gen"] = [99.0]
+	fake_cells["s"]["m"]["gen"] = [99.0, 98.0, 97.0]
 	var moved := states(judge(fake_cells))
 	if base_state.get("s/m") != true or moved.get("s/m") != false:
 		res.fail("control: the judge does not tell in from out")
@@ -307,6 +384,19 @@ static func _control(res: SuiteResult) -> void:
 		res.fail("control: a cell leaving its band is not reported as a regression")
 	elif not regressions(moved, base_state).is_empty():
 		res.fail("control: a cell entering its band is reported as a regression")
+	res.checked += 1
+	# noise: a sample straddling the edge is unsure, which is not a pass
+	var straddle := {"s": {"m": {"real": real, "gen": [1.0, 3.0, 5.0, 6.5, 7.0, 7.5]}}}
+	if judge(straddle)["s"]["m"]["state"] == "in":
+		res.fail("control: a sample straddling the band edge was passed as in")
+	# a metric scaled far outside the band stays out beyond noise
+	res.checked += 1
+	var live := {"s": {"m": {"real": real, "gen": [2.0, 3.0, 4.0, 5.0, 3.5, 2.5]}}}
+	var scaled := {"s": {"m": {"real": real, "gen": []}}}
+	for v in live["s"]["m"]["gen"]:
+		scaled["s"]["m"]["gen"].append(v * 40.0)
+	if judge(live)["s"]["m"]["state"] != "in" or judge(scaled)["s"]["m"]["state"] != "high":
+		res.fail("control: a metric scaled 40x was not judged out beyond the noise")
 
 
 # ------------------------------------------------------------- report
@@ -347,9 +437,10 @@ static func _report(res: SuiteResult, table: Dictionary, plans: Dictionary, n_re
 	for st in STRATA:
 		for m in METRICS:
 			var r: Dictionary = table[st][m]
-			if r["state"] == "low" or r["state"] == "high":
-				res.note("OUT %s %s: generated %s, real p10-p90 %s-%s (%s)" % [st, m, _fmt(r["gen"]),
-					_fmt(r["p10"]), _fmt(r["p90"]), r["state"]])
+			if r["state"] == "low" or r["state"] == "high" or r["state"] == "unsure":
+				res.note("%s %s %s: generated %s [%s-%s], real p10-p90 %s-%s" % [
+					"UNSURE" if r["state"] == "unsure" else "OUT " + r["state"], st, m, _fmt(r["gen"]),
+					_fmt(r["lo"]), _fmt(r["hi"]), _fmt(r["p10"]), _fmt(r["p90"])])
 
 
 static func markdown(table: Dictionary, plans: Dictionary, n_real: int) -> String:
@@ -372,8 +463,8 @@ static func markdown(table: Dictionary, plans: Dictionary, n_real: int) -> Strin
 			if r["state"] == "na":
 				row += " - |"
 			else:
-				var tag: String = "in" if r["state"] == "in" else r["state"].to_upper()
-				row += " %s (%s-%s) %s |" % [_fmt(r["gen"]), _fmt(r["p10"]), _fmt(r["p90"]), tag if r["state"] != "in" else "in"]
+				row += " %s [%s-%s] (%s-%s) %s |" % [_fmt(r["gen"]), _fmt(r["lo"]), _fmt(r["hi"]),
+					_fmt(r["p10"]), _fmt(r["p90"]), "in" if r["state"] == "in" else r["state"].to_upper()]
 		out += row + "\n"
 	return out
 
@@ -388,7 +479,7 @@ static func _update(res: SuiteResult, table: Dictionary, plans: Dictionary, n_re
 	keys.sort()
 	var sorted := {}
 	for k in keys:
-		sorted[k] = cells[k]
+		sorted[k] = cells[k] is bool and cells[k]     # unsure is not in
 	f.store_string(JSON.stringify({"about": "VTER-REALISM baseline: true = the generated median was inside the real p10-p90 of the stratum. The vrealism suite fails when a true becomes false.",
 		"cells": sorted}, "  ", true) + "\n")
 	f.close()
