@@ -80,7 +80,73 @@ static func run() -> SuiteResult:
 	_synthetic(res)
 	_real30(res)
 	_exporter(res)
+	_capacity(res)
 	return res
+
+
+## BG-012-EARLY-REFUSE: VillageCapacity on hand-made jobs (no building is
+## generated). A cottage-sized programme on dry plane ground fits; the same
+## programme on a drowned plain, on a 100 % wall, and with a castle that needs a
+## clear disc the dry hump does not have, is refused, each naming its rule.
+static func _capacity(res: SuiteResult) -> void:
+	var rect := Rect2(-400, -400, 800, 800)
+	var grounds := {
+		"plane": VillageTerrain.from_sampler(func(_x: float, z: float) -> float: return 100.0 - 0.3 * z, rect, 5.0),
+		"drowned": VillageTerrain.from_sampler(func(x: float, z: float) -> float:
+			return 10.0 if Vector2(x, z).length() < 8.0 else 0.0, rect, 5.0, 5.0),
+		"wall": VillageTerrain.from_sampler(func(_x: float, z: float) -> float: return z, rect, 5.0),
+		# dry ground 28 m wide between two lakes: room for the cottages, not for a castle's disc
+		"strip": VillageTerrain.from_sampler(func(_x: float, z: float) -> float:
+			return 10.0 if absf(z) < 14.0 else 0.0, rect, 5.0, 5.0),
+	}
+	var small := BuildingRequest.new()
+	small.kind = &"house"
+	var big := BuildingRequest.new()
+	big.kind = &"castle"
+	var hold := func(count: int, castle: bool) -> Array[Dictionary]:
+		var jobs: Array[Dictionary] = []
+		for i in range(count):
+			jobs.append({"request": small, "class": &"cottage", "footprint": Rect2(-4, -3, 8, 6)})
+		if castle:
+			jobs.append({"request": big, "class": &"manor", "footprint": Rect2(-40, -40, 80, 80)})
+		return jobs
+	var want := {"plane": false, "drowned": true, "wall": true, "strip": true}
+	for name in grounds:
+		var spec := VillageSpec.new(1)
+		spec.form = &"street"
+		var plan := VillagePlan.new(spec)
+		plan.site = Rect2(-60, -45, 120, 90)
+		plan.ground = grounds[name]
+		var jobs: Array[Dictionary] = hold.call(12, name == "strip")
+		var got := VillageCapacity.estimate(plan, jobs)
+		res.checked += 2
+		if got.is_empty() or bool(got["refuse"]) != bool(want[name]):
+			res.fail("capacity %s: refuse is %s, wanted %s (%s)" % [name, got.get("refuse"), want[name], got.get("reason")])
+		if bool(want[name]) and (got["rules"] as Array).is_empty():
+			res.fail("capacity %s: a refusal names no rule" % name)
+	# the wet ground is named wet, the wall cliff
+	var drowned := VillageCapacity.estimate(_plan_on(grounds["drowned"]), hold.call(12, false))
+	var wall := VillageCapacity.estimate(_plan_on(grounds["wall"]), hold.call(12, false))
+	res.checked += 2
+	if float(drowned["rules"][0]["share"]) < 0.9 or String(drowned["rules"][0]["rule"]) != "wet":
+		res.fail("capacity: drowned ground is not mostly wet: %s" % [drowned["rules"]])
+	if float(wall["rules"][1]["share"]) < 0.9 or String(wall["rules"][1]["rule"]) != "cliff":
+		res.fail("capacity: the wall is not mostly cliff: %s" % [wall["rules"]])
+	# a water village stands in the water: no estimate, never a refusal
+	var water_plan := _plan_on(grounds["drowned"])
+	water_plan.spec.form = &"water"
+	res.checked += 1
+	if not VillageCapacity.estimate(water_plan, hold.call(12, false)).is_empty():
+		res.fail("capacity: a water village was estimated against its own water")
+
+
+static func _plan_on(ground: VillageTerrain) -> VillagePlan:
+	var spec := VillageSpec.new(1)
+	spec.form = &"street"
+	var plan := VillagePlan.new(spec)
+	plan.site = Rect2(-60, -45, 120, 90)
+	plan.ground = ground
+	return plan
 
 
 ## h = 0.1 x + 0.05 y + 20 over [-50, 50]^2 at 5 m.

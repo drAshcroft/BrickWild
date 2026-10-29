@@ -115,6 +115,12 @@ var crest: Dictionary = {}
 ## two ends)}; empty for every other form.
 var island: Dictionary = {}
 
+## How the lot search ended (BG-012-EARLY-REFUSE): {"attempts", "elapsed_s",
+## "stopped": "" | "capacity" | "budget_time" | "budget_attempts",
+## "capacity": VillageCapacity.estimate (or {})}. Empty for a plan that was
+## not made by `VillageLotPlanner.plan_measured`.
+var search: Dictionary = {}
+
 
 ## The ground readings of this plan are taken on: `ground` when the village
 ## was sited, else the spec's own (null when flat).

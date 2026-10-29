@@ -54,6 +54,16 @@ extends SceneTree
 ## `site.yaw_deg`) and its roads laid by grade. Without it the output is
 ## byte-identical to before.
 ##
+## A request the ground cannot hold is refused EARLY and WITH A REASON
+## (BG-012-EARLY-REFUSE, docs/VILLAGE_TERRAIN.md "Refusing early"): with
+## `--terrain`, a cheap capacity estimate runs before the lot search and skips
+## it when the dry, climbable ground cannot hold the programme. The search is
+## also bounded: `--search-budget-s N` (wall seconds of lot search, default
+## 1200, 0 for none) and `--search-attempts N` (re-plans, default 0 = none).
+## A refused request still writes `--out`: the best partial plan, plus a
+## `refused` block {reason, stopped, requested, placed, unplaced[], capacity,
+## search}. `capacity.rules` names what removed the room (wet, cliff) in m2.
+##
 ## Exit codes: 0 written, 2 usage or I/O, 3 refused (cannot satisfy).
 ##
 ## Scope, deliberately: no mesh, no props-as-geometry, no assets. This is the
@@ -70,13 +80,17 @@ const PLACES := 0.001
 ## The site is capped at BrickWild's own maximum however big a cell is.
 const SITE_MAX_M := 400.0
 const BUILDING_MAX := 140
+## Wall seconds the lot search may spend, when the caller says nothing. The
+## flat 21-building city took 261 s in all; the same city on a 720 m grid took
+## 2562 s and still did not fit.
+const SEARCH_BUDGET_DEFAULT_S := 1200.0
 
 
 func _init() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 	var opts: Dictionary = _options(args)
 	if not opts.has("request") or not opts.has("out"):
-		printerr("usage: --request <in.json> --out <out.json> [--population <people>] [--implied-population <people>] [--terrain <grid.json>]")
+		printerr("usage: --request <in.json> --out <out.json> [--population <people>] [--implied-population <people>] [--terrain <grid.json>] [--search-budget-s <s>] [--search-attempts <n>]")
 		quit(2)
 		return
 	var text: String = _read(opts["request"])
@@ -114,6 +128,8 @@ func _init() -> void:
 		quit(3)
 		return
 	spec.terrain = ground
+	spec.search_budget_s = float(String(opts.get("search-budget-s", "%f" % SEARCH_BUDGET_DEFAULT_S)))
+	spec.search_max_attempts = int(String(opts.get("search-attempts", "0")))
 	if not spec.valid():
 		printerr("SiteRequest does not map to a village: %s" % ", ".join(spec.errors()))
 		quit(3)
@@ -140,9 +156,20 @@ func _init() -> void:
 		quit(3)
 		return
 	if plan.buildings.size() < requested_buildings:
+		var refused: Dictionary = refusal(plan, programme, requested_buildings)
 		printerr("SiteRequest refused: only %d of %d requested buildings fit in %.1f m (unplaced: %s; planned site %.0f x %.0f m)" % [
 			plan.buildings.size(), requested_buildings, spec.requested_site_m,
 			", ".join(unplaced_labels(programme, plan)), plan.site.size.x, plan.site.size.y])
+		printerr("  why: %s" % String(refused["reason"]))
+		# the best partial plan beside the refusal; the exit code stays 3
+		var partial: Dictionary = site_plan(plan, request)
+		partial["refused"] = refused
+		var pf := FileAccess.open(opts["out"], FileAccess.WRITE)
+		if pf != null:
+			pf.store_string(JSON.stringify(partial, "	", true) + "
+")
+			pf.close()
+			printerr("  partial plan (%d buildings) and the refusal written to %s" % [plan.buildings.size(), opts["out"]])
 		quit(3)
 		return
 	if ground != null and not covers_plan(ground, plan):
@@ -226,6 +253,43 @@ static func with_implied_population(request: Dictionary, implied_arg: String) ->
 
 static func _whole(value: Variant) -> String:
 	return "%d" % int(value) if _is_number(value) else str(value)
+
+
+## The `refused` block of a plan that could not place the programme: why, how
+## the lot search ended, what the ground took away, and what is left over.
+static func refusal(plan: VillagePlan, programme: Array[BuildingRequest], requested: int) -> Dictionary:
+	var search: Dictionary = plan.search
+	var capacity: Dictionary = search.get("capacity", {})
+	var stopped: String = String(search.get("stopped", ""))
+	var parts: Array[String] = []
+	match stopped:
+		"capacity":
+			parts.append("refused early, before the lot search: %s" % String(capacity.get("reason", "")))
+		"budget_time":
+			parts.append("the lot search spent its %.0f s budget (%d re-plans)" % [
+				plan.spec.search_budget_s, int(search.get("attempts", 0))])
+		"budget_attempts":
+			parts.append("the lot search spent its %d re-plan budget" % plan.spec.search_max_attempts)
+		_:
+			parts.append("the lot search tried every site width and found no frontage for the rest (%d re-plans, %.0f s)" % [
+				int(search.get("attempts", 0)), float(search.get("elapsed_s", 0.0))])
+	var rules: Array = capacity.get("rules", [])
+	if not rules.is_empty():
+		var named: Array[String] = []
+		for r in rules:
+			named.append("%s %.0f m2 (%.1f %%)" % [r["rule"], float(r["removed_m2"]), float(r["share"]) * 100.0])
+		parts.append("ground removed from the largest site of %.0f m2: %s; %.0f m2 more is steep but climbable" % [
+			float(capacity.get("envelope_m2", 0.0)), ", ".join(named), float(capacity.get("steep_m2", 0.0))])
+	return {
+		"reason": "; ".join(parts),
+		"stopped": stopped if stopped != "" else "exhausted",
+		"requested": requested,
+		"placed": plan.buildings.size(),
+		"unplaced": unplaced_labels(programme, plan),
+		"capacity": capacity.duplicate(true),
+		"search": {"attempts": int(search.get("attempts", 0)),
+			"elapsed_s": float(search.get("elapsed_s", 0.0))},
+	}
 
 
 ## What the programme asked for and the plan did not place, as `kind/purpose`.

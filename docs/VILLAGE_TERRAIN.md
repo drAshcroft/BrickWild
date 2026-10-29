@@ -2191,6 +2191,45 @@ form off: no island plan, 0.28 reached); purity.
   least 5x faster (measured 270-380x). `fingerprint_village_ground`: the five cases
   the base finished are identical, strand-coast-hedge included.
 
+## Refusing early (BG-012-EARLY-REFUSE)
+
+VoxelGames BG-012: a 21-building garrison city on a 720 m grid was refused by
+`export_village_plan.gd` after 2,562 s (19 placed; flat, the same city plans in
+261 s), with no reason. The time is the lot planner's retry ladder
+(`VillageLotPlanner.plan_measured`): up to fifteen full site re-plans, then the
+seat's head-clearing and the finer width steps, each a whole `cut_measured`
+(a castle's sloped mesh is measured per lattice point). Three changes:
+
+- **Capacity estimate** (`VillageCapacity`, `plan.search["capacity"]`). On
+  given ground, before the ladder, from the measured footprints and the sited
+  ground alone (milliseconds). The room is an upper bound (the largest site the
+  planner can ever lay, less the nodes whose whole 3 x 3 neighbourhood is
+  `wet` or, for houses and shops only, `cliff` > `PATH_MAX`; a church and a seat
+  are terraced and lose wet ground only; `steep` is reported, removes nothing);
+  the need a lower bound (the walls' footprints, and a clear disc of each
+  building's shorter side less 10 m). It refuses only what could not have fitted.
+  A `water` form is not estimated. It catches gross cases (a drowned plain, an
+  escarpment); a programme short by shape (the Thaanñafu castle's 90 m lot) is
+  left to the budget. Off with `spec.refuse_early = false`.
+- **Search budget.** `spec.search_budget_s` (wall seconds) and
+  `spec.search_max_attempts` (re-plans, deterministic); 0 is none, the planner
+  default. Spent while a building is unplaced, the ladder stops and the best
+  plan so far is kept. `plan.search` = `{attempts, elapsed_s, stopped, capacity}`,
+  `stopped` one of `""`, `capacity`, `budget_time`, `budget_attempts`.
+- **Exporter.** `--search-budget-s N` (default 1200, 0 none) and
+  `--search-attempts N` (default 0). A refused request (exit 3) now also writes
+  `--out`: the partial plan plus `refused` = `{reason, stopped, requested,
+  placed, unplaced[], capacity, search}`; `capacity.rules` is
+  `[{rule: wet|cliff, removed_m2, share}]` of `envelope_m2`, with `usable_m2`,
+  `need_m2`. stderr carries the same as a `why:` line. A plan that fits is
+  byte-identical (no `search` in the output). The 1200 s default does cut a
+  fitting plan that needs longer; pass `--search-budget-s 0` for that.
+
+Suites: `vterrain` (`_capacity`: dry, drowned, wall and strip ground on
+hand-made jobs; 178 checks) and `lane:village-terrain` (`_estimate_spares`: no
+fixture that plans is refused; `_refusals`: drowned and wall ground refuse in
+3 s with the rule named, and the 1-attempt and 1 ms budgets return a partial).
+
 ## Visual check (2026-10-28)
 
 VTER-VISUAL, the agent half. A village planned and built on each real ground

@@ -57,6 +57,18 @@ var terrain_envelope: Dictionary = {}
 ## (docs/VILLAGE_TERRAIN.md); without it every output is byte-identical.
 var terrain: VillageTerrain = null
 var requested_site_m: float = 400.0
+## The lot planner's search budget (BG-012-EARLY-REFUSE). 0 is none: the
+## whole retry ladder runs, as it always did. When either is set and the
+## village is still short of a building, the planner stops trying wider
+## sites and returns the best plan so far (`plan.search` says so).
+## `search_budget_s` is wall seconds from the start of lot cutting;
+## `search_max_attempts` counts re-plans and is the deterministic one.
+var search_budget_s: float = 0.0
+var search_max_attempts: int = 0
+## On given ground, a cheap capacity estimate (VillageCapacity) is made before
+## the retry ladder; when the dry, climbable ground cannot hold the programme
+## the ladder is skipped. Conservative: it never refuses what would have fitted.
+var refuse_early: bool = true
 
 # ---- derived from seed + the six above ----
 var households: int = 0

@@ -83,6 +83,7 @@ static func run() -> SuiteResult:
 	for case in CASES:
 		_case(res, jobs, case[0], case[1], case[2])
 	_controls(res, jobs)
+	_refusals(res, jobs)
 	res.note("total %.1f s" % ((Time.get_ticks_msec() - t0) / 1000.0))
 	return res
 
@@ -118,6 +119,7 @@ static func _case(res: SuiteResult, jobs: Array[Dictionary], name: String, form:
 		res.fail("%s: the plan was not sited on its ground" % label)
 		return
 	_sited(res, ground, plan, label)
+	_estimate_spares(res, plan, label)
 	_grades(res, ground, plan, label)
 	_dry(res, plan, label)
 	_falls(res, plan, label)
@@ -396,6 +398,83 @@ static func _v3(a: Array) -> Vector3:
 
 
 ## One failing control per rule, each through the function the cases use.
+## (f) BG-012-EARLY-REFUSE. The capacity estimate must never refuse a case that
+## fits: every fixture above planned, so none may carry a capacity stop. The
+## failing controls are `_refusals`: ground that cannot hold the programme.
+static func _estimate_spares(res: SuiteResult, plan: VillagePlan, label: String) -> void:
+	var capacity: Dictionary = plan.search.get("capacity", {})
+	res.checked += 1
+	if plan.search.is_empty() or capacity.is_empty():
+		res.fail("%s: the plan carries no capacity estimate" % label)
+	elif bool(capacity["refuse"]) or String(plan.search["stopped"]) != "":
+		res.fail("%s: the estimate refused ground that planned (%s, stopped %s)" % [
+			label, capacity["reason"], plan.search["stopped"]])
+
+
+## A hump 8 m across in a drowned plain, and a wall (100 %) with no level ground.
+static func _hopeless(name: String) -> VillageTerrain:
+	var rect := Rect2(-400, -400, 800, 800)
+	if name == "drowned":
+		return VillageTerrain.from_sampler(func(x: float, z: float) -> float:
+			return 10.0 if Vector2(x, z).length() < 8.0 else 0.0, rect, 5.0, 5.0)
+	return VillageTerrain.from_sampler(func(_x: float, z: float) -> float: return z, rect, 5.0)
+
+
+static func _refusals(res: SuiteResult, jobs: Array[Dictionary]) -> void:
+	var programme: Array[BuildingRequest] = []
+	for job in jobs:
+		programme.append(job["request"])
+	for name in ["drowned", "wall"]:
+		var t0 := Time.get_ticks_msec()
+		var plan := VillageLotPlanner.plan_measured(spec_for(&"street", _hopeless(name)), jobs)
+		var secs := (Time.get_ticks_msec() - t0) / 1000.0
+		var cap: Dictionary = plan.search.get("capacity", {})
+		res.checked += 4
+		if String(plan.search.get("stopped", "")) != "capacity" or not bool(cap.get("refuse", false)):
+			res.fail("refuse %s: the estimate let hopeless ground through (%s)" % [name, plan.search])
+			continue
+		if int(plan.search["attempts"]) != 0:
+			res.fail("refuse %s: the ladder ran %d re-plans after an early refusal" % [name, plan.search["attempts"]])
+		var rule := "wet" if name == "drowned" else "cliff"
+		var named := {}
+		for r in cap["rules"]:
+			named[r["rule"]] = float(r["share"])
+		if float(named.get(rule, 0.0)) < 0.9:
+			res.fail("refuse %s: the breakdown does not name %s as most of the ground: %s" % [name, rule, cap["rules"]])
+		var block := EXPORTER.refusal(plan, programme, programme.size())
+		if String(block["reason"]).find(rule) < 0 or String(block["stopped"]) != "capacity" 				or (block["unplaced"] as Array).size() != programme.size() - plan.buildings.size():
+			res.fail("refuse %s: the refusal block is incomplete: %s" % [name, block])
+		res.note("refuse %-7s %.1f s, stopped %s | %s" % [name, secs, plan.search["stopped"], block["reason"]])
+	# the budget: the programme with its households three times over does not fit
+	# cliff_band at all (28 of 30 after all fifteen re-plans, 38 s); one re-plan,
+	# or a millisecond, is not enough either, and the plan so far comes back
+	var crowd: Array[Dictionary] = []
+	for again in range(4):
+		for job in jobs:
+			if again > 0 and not (job["class"] in [&"cottage", &"farm", &"townhouse"]):
+				continue
+			var copy := job.duplicate()
+			copy["order"] = crowd.size()
+			crowd.append(copy)
+	for budget in [{"attempts": 1}, {"seconds": 0.001}]:
+		var spec := spec_for(&"gate", SYNTH.make("cliff_band"))
+		spec.search_max_attempts = int(budget.get("attempts", 0))
+		spec.search_budget_s = float(budget.get("seconds", 0.0))
+		var t1 := Time.get_ticks_msec()
+		var plan := VillageLotPlanner.plan_measured(spec, crowd)
+		var want := "budget_attempts" if budget.has("attempts") else "budget_time"
+		res.checked += 3
+		if String(plan.search.get("stopped", "")) != want:
+			res.fail("budget %s: stopped '%s'" % [budget, plan.search.get("stopped", "")])
+		if plan.buildings.is_empty() or plan.buildings.size() >= crowd.size():
+			res.fail("budget %s: %d of %d placed, a partial plan wants some but not all" % [
+				budget, plan.buildings.size(), crowd.size()])
+		if budget.has("attempts") and int(plan.search["attempts"]) != 1:
+			res.fail("budget %s: %d re-plans" % [budget, plan.search["attempts"]])
+		res.note("budget %s: %d of %d placed in %.1f s, %d re-plans" % [budget, plan.buildings.size(),
+			crowd.size(), (Time.get_ticks_msec() - t1) / 1000.0, plan.search["attempts"]])
+
+
 static func _controls(res: SuiteResult, jobs: Array[Dictionary]) -> void:
 	# (a) a through road laid up plane_30's fall line: 30 % against a cart's 12 %
 	var plane := SYNTH.make("plane_30")

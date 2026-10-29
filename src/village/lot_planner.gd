@@ -84,6 +84,44 @@ const MANOR_LANE_LEAN := -0.35
 const MANOR_LANE_MAX := 40.0
 
 
+## The lot search's budget and its record (BG-012-EARLY-REFUSE). Static, set by
+## `plan_measured` and cleared when it returns; nothing else reads it.
+static var _search := {}
+static var _search_t0 := 0
+static var _search_budget_s := 0.0
+static var _search_max := 0
+
+
+static func _search_begin(spec: VillageSpec) -> void:
+	_search = {"attempts": 0, "stopped": "", "capacity": {}}
+	_search_t0 = Time.get_ticks_msec()
+	_search_budget_s = spec.search_budget_s
+	_search_max = spec.search_max_attempts
+
+
+static func _search_end() -> Dictionary:
+	var out := _search.duplicate(true)
+	out["elapsed_s"] = snappedf(float(Time.get_ticks_msec() - _search_t0) / 1000.0, 0.1)
+	_search = {}
+	_search_budget_s = 0.0
+	_search_max = 0
+	return out
+
+
+## True once the ladder should stop climbing: the capacity estimate refused, or
+## the wall-time or attempt budget the caller set is spent.
+static func _search_spent() -> bool:
+	if _search.is_empty():
+		return false
+	if String(_search.get("stopped", "")) != "":
+		return true
+	if _search_budget_s > 0.0 and float(Time.get_ticks_msec() - _search_t0) / 1000.0 >= _search_budget_s:
+		_search["stopped"] = "budget_time"
+	elif _search_max > 0 and int(_search.get("attempts", 0)) >= _search_max:
+		_search["stopped"] = "budget_attempts"
+	return String(_search.get("stopped", "")) != ""
+
+
 ## Site plan + lots + buildings, from the spec alone. The whole of VIL-004.
 ## Returns a fresh plan; `spec` is not modified.
 static func plan(spec: VillageSpec) -> VillagePlan:
@@ -96,8 +134,10 @@ static func plan(spec: VillageSpec) -> VillagePlan:
 ## crossings, enclosure and dressing still run through this one pipeline.
 static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> VillagePlan:
 	jobs = _classified(spec, jobs)
+	_search_begin(spec)
 	var out: VillagePlan = VillageSitePlanner.plan(spec)
 	if out.roads.is_empty():
+		_search_end()
 		return out
 	# every request is generated and measured ONCE; the retries below only
 	# redo the geometry
@@ -105,6 +145,13 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 	var shore_depth := _strand_row_depth(jobs) if spec.form in [&"strand", &"shore", &"water"] else 0.0
 	if minimum_depth > out.site.size.y or shore_depth > 0.0:
 		out = VillageSitePlanner.plan(spec, 0, 1.0, minimum_depth, shore_depth)
+	# BG-012-EARLY-REFUSE: on given ground, ask first whether the dry, climbable
+	# ground can hold the programme at all. If it cannot, the ladder below
+	# (minutes per rung) is skipped and the one plan cut here is the partial.
+	if spec.refuse_early and out.ground != null:
+		_search["capacity"] = VillageCapacity.estimate(out, jobs)
+		if bool((_search["capacity"] as Dictionary).get("refuse", false)):
+			_search["stopped"] = "capacity"
 	# every household gets a lot (VIL-006 "housed"): when the form's own
 	# roads run out of frontage, the site planner is asked for more lanes,
 	# two at a time, until nothing is left unplaced or the site is full
@@ -127,6 +174,8 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 	var over_cap_skipped := false
 	for attempt in attempts:
 		if unplaced <= 0 and bool(common_state["ready"]):
+			break
+		if unplaced > 0 and _search_spent():
 			break
 		# These authored forms deliberately ignore generic extra lanes. Do
 		# not recut an identical site six times before trying more frontage.
@@ -156,6 +205,8 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 		for scale in FINE_WIDTH_STEPS:
 			if scale <= float(accepted[1]):
 				continue
+			if _search_spent():
+				break
 			var between: VillagePlan = _replan(spec, jobs, int(accepted[0]), scale, minimum_depth, shore_depth)
 			if _through_over_cap(between):
 				continue
@@ -173,7 +224,7 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 	# the eastern head only now, so a village that already planned is the
 	# same village it was.
 	var accepted_head := false
-	if unplaced > 0 and _manor_unplaced(out, jobs):
+	if unplaced > 0 and not _search_spent() and _manor_unplaced(out, jobs):
 		# Never narrower than the band `_place_manor` searches needs: the
 		# coarse ladder alone took a 12 m hold to a 270 m site and broke the
 		# density floor.
@@ -196,6 +247,8 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 				head_attempts.append(widened)
 		for attempt in head_attempts:
 			if unplaced <= 0 and bool(common_state["ready"]):
+				break
+			if unplaced > 0 and _search_spent():
 				break
 			var again: VillagePlan = _replan(spec, jobs, int(attempt[0]), float(attempt[1]),
 				minimum_depth, shore_depth, true)
@@ -322,6 +375,7 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 	# judging the props as much as the buildings.
 	VillageDresser.dress(out)
 	VillageDispersedForm.dress_hamlets(out)
+	out.search = _search_end()
 	return out
 
 
@@ -491,6 +545,7 @@ static var turn_enabled := true
 static func _replan(spec: VillageSpec, jobs: Array[Dictionary], lanes: int, scale: float,
 		minimum_depth: float, shore_depth: float, clear_head := false,
 		hill := {}) -> VillagePlan:
+	_search["attempts"] = int(_search.get("attempts", 0)) + 1
 	var again: VillagePlan = VillageSitePlanner.plan(spec, lanes, scale, minimum_depth, shore_depth, hill)
 	var retry_depth := _manor_site_depth(again, jobs)
 	if retry_depth > again.site.size.y + 0.001:
@@ -717,6 +772,10 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 	# big house that would not fit near the common let every smaller one past.
 	var gradient_floor := 0.0
 	for job in jobs:
+		# a retry that runs past the wall-time budget stops placing: it can only
+		# lose to the plan already kept
+		if _search_budget_s > 0.0 and int(_search.get("attempts", 0)) > 0 and _search_spent():
+			continue
 		var cls: StringName = job["class"]
 		if cls == &"church" and plan.landmark_reserved():
 			# a crest village's church stands inside the ring, high (VTER-FORM-CREST)
