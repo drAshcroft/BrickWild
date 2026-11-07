@@ -1,0 +1,15 @@
+{
+  "about": "A tiny series for checking the rig and the baker (a few minutes). Not a QA walk.",
+  "stops": [
+    {
+      "why": "smoke: a hamlet with a windmill, a church and a temple added",
+      "culture": "english", "purpose": "farming", "population": 15, "seed": 3,
+      "extras": [
+        {"kind": "windmill", "style": "post"},
+        {"kind": "church", "style": "gothic"},
+        {"kind": "temple", "style": "rotunda", "purpose": "flame", "width": 18, "length": 24},
+        {"kind": "castle", "style": "wizard", "width": 22, "length": 24}
+      ]
+    }
+  ]
+}

@@ -89,6 +89,9 @@ godot --headless --path . --script res://tools/replay_walk_pins.gd -- since=2026
 # human walk-through QA: build one building, walk it, right-click to pin problems
 # (appends to visualqa/HumanRate.md + visualqa/walk_pins.jsonl; see visualqa/README.md)
 godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=house --seed=8102
+# the default walk is a series of villages (visualqa/villages/mixed.json) that
+# holds every published style; bake it first, in the background (hours):
+.\visualqa\walk.ps1 -Bake      # -> artifacts/walk_villages/, then .\visualqa\walk.ps1
 
 # freeze a release for OTHER projects (from a commit, never the working tree;
 # background it). Bump VERSION, plugin.cfg and the manifest version first.

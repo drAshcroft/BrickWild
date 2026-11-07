@@ -1,7 +1,8 @@
 extends Control
-## Walk QA: generate one BrickWild building, walk through it, pin problems.
+## Walk QA: generate a series of villages (or one building), walk them, pin problems.
 ##
-##   godot --path . res://visualqa/walk/walk_qa.tscn
+##   godot --path . res://visualqa/walk/walk_qa.tscn         (the village series "mixed")
+##   ... -- --villages=mixed [--stop=3] [--seed=7]  (visualqa/villages/<name>.json)
 ##   godot --path . res://visualqa/walk/walk_qa.tscn -- --kind=house --seed=8102 --style=cottage
 ##   ... -- --kind=house --jank=0.6 | --fall=2 --downhill=90 | --foundation=piles --water=1.5
 ##   ... -- --tour=sprint_2026_10_26 [--stop=3]    (a bug walk: visualqa/tours/<name>.json)
@@ -23,6 +24,7 @@ extends Control
 ## you cannot fit through is a doorway the generator made too narrow.
 
 const SIDEBAR_W := 360.0
+const WalkVillage := preload("res://visualqa/walk/walk_village.gd")
 const FIELDS := ["pretty", "collisions", "window problems", "door problems", "roof problems"]
 const LABELS := ["Pretty", "Collisions", "Window problems", "Door problems", "Roof problems"]
 ## No default: the dialog opens on CHOOSE and will not pin until a kind is
@@ -110,9 +112,27 @@ var _tour_name := ""
 var _tour: Array = []
 var _tour_i := -1
 var _base := {}
-## A village planned on a terrain fixture (--village-terrain=<name>): there is
-## no GeneratedBuilding, only the assembled scene.
+## A village series: visualqa/villages/<name>.json, a list of village stops
+## (culture, purpose, population, wealth, water, enclosure, terrain, seed,
+## extras, why). `extras` are request dicts added to the village's own
+## programme, so a series shows kinds and styles its cultures would not build.
+const SERIES_DIR := "res://visualqa/villages/"
+const DEFAULT_SERIES := "mixed"
+var _series_name := ""
+var _series: Array = []
+var _series_i := -1
+## The village being walked: a series stop, or {"terrain": name} for
+## --village-terrain. Empty when one building is walked. A village has no
+## GeneratedBuilding, only the assembled scene and its plan.
+var _village := {}
+var _village_rows: Array[Dictionary] = []
+var _village_meta := {}
+## --live: plan every village now, never load a bake.
+var _live := false
 var _terrain_name := ""
+var _village_list: ItemList
+var _village_label: Label
+var _looking_at := ""
 var _filer_pid := -1
 var _filer_dry := false
 ## A pin arrived while the filer was still running: file again when it ends.
@@ -154,6 +174,7 @@ func _ready() -> void:
 	_fill_kinds(args)
 	if args.has("no-file"):
 		_file_todos.button_pressed = false
+	_live = args.has("live")
 	if args.has("tour"):
 		var err := _load_tour(String(args["tour"]))
 		if err != "":
@@ -165,9 +186,22 @@ func _ready() -> void:
 			for k in ["tour", "stop", "autoshot", "autopin", "walk", "rate-file", "no-file"]:
 				over.erase(k)
 			_enter_stop(at, over)
+	var single := args.has("kind") or args.has("tour")
 	if args.has("village-terrain"):
-		_terrain_name = String(args["village-terrain"])
-		await _generate_terrain_village()
+		_village = {"terrain": String(args["village-terrain"]), "seed": int(args.get("seed", "1"))}
+		_seed_spin.value = _village["seed"]
+		await _generate_village()
+	elif args.has("villages") or not single:
+		var series := String(args.get("villages", ""))
+		var err := _load_series(series if series != "" else DEFAULT_SERIES)
+		if err != "":
+			_status.text = err
+			await _generate()
+		else:
+			_enter_village(clampi(int(args.get("stop", "1")) - 1, 0, _series.size() - 1))
+			if args.has("seed"):
+				_seed_spin.value = int(args["seed"])
+			await _generate_village()
 	else:
 		await _generate()
 	if args.has("autoshot"):
@@ -294,6 +328,15 @@ func _build_ui() -> void:
 	_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_info.add_theme_color_override("font_color", Color(0.75, 0.78, 0.72))
 	box.add_child(_info)
+	_village_label = Label.new()
+	_village_label.text = "Buildings (double-click: go to its door)"
+	_village_label.visible = false
+	box.add_child(_village_label)
+	_village_list = ItemList.new()
+	_village_list.custom_minimum_size.y = 180
+	_village_list.visible = false
+	_village_list.item_activated.connect(_go_to_building)
+	box.add_child(_village_list)
 
 	box.add_child(HSeparator.new())
 	var rate := Label.new()
@@ -363,8 +406,11 @@ func _build_ui() -> void:
 	box.add_child(help)
 
 
+## Build always builds the sidebar's one building. In a village series that
+## steps off the series; "Save & next village" goes back to it.
 func _on_build() -> void:
 	if not _busy:
+		_leave_village()
 		_generate()
 
 
@@ -737,11 +783,26 @@ func _request_from_ui() -> BuildingRequest:
 ## the sidebar does not carry (width, storeys) come back too.
 func _reopen_command(req: BuildingRequest) -> String:
 	var parts := PackedStringArray([".\\visualqa\\walk.ps1"])
-	if _terrain_name != "":
-		parts.append("--village-terrain=%s --seed=%d" % [_terrain_name, req.seed])
+	if not _village.is_empty():
+		if _series_name != "" and _village.has("series_stop"):
+			parts.append("--villages=%s --stop=%d --seed=%d" % [_series_name, _series_i + 1, req.seed])
+		else:
+			parts.append("--village-terrain=%s --seed=%d" % [_terrain_name, req.seed])
+		if _cutaway.button_pressed:
+			parts.append("--cutaway")
 		return " ".join(parts)
 	if _tour_name != "" and not _base.is_empty():
 		parts.append("--tour=%s --stop=%d" % [_tour_name, _tour_i + 1])
+	parts.append(_building_args(req))
+	if _cutaway.button_pressed:
+		parts.append("--cutaway")
+	return " ".join(parts)
+
+
+## The rig's flags for one request, without the launcher or the cutaway: the
+## single-building reopen line, and a village pin's "this building alone".
+static func _building_args(req: BuildingRequest) -> String:
+	var parts := PackedStringArray()
 	parts.append("--kind=%s --seed=%d" % [req.kind, req.seed])
 	if String(req.style) != "":
 		parts.append("--style=%s" % req.style)
@@ -755,8 +816,6 @@ func _reopen_command(req: BuildingRequest) -> String:
 		parts.append("--fall=%s --downhill=%s" % [_num(req.ground_fall_m), _num(req.ground_downhill_deg)])
 	if req.foundation == &"piles":
 		parts.append("--foundation=piles --water=%s" % _num(req.pile_water_m))
-	if _cutaway.button_pressed:
-		parts.append("--cutaway")
 	return " ".join(parts)
 
 
@@ -836,71 +895,212 @@ func _place_ground(req: BuildingRequest) -> void:
 	_ground.transform = Transform3D(Basis(Quaternion(Vector3.UP, n)), Vector3(0, g * lo - 0.02, 0))
 
 
-## --village-terrain=<fixture>: a village planned on real ground the way the
-## vgroundterrain suite plans one (VillageSpec with terrain -> lot planner ->
-## VillageAssembler), every mesh made solid. The rig's flat ground is put
-## away; the village's own ground is walked.
-func _generate_terrain_village() -> void:
+## A village: the current series stop, or --village-terrain=<fixture>. A bake
+## (tools/bake_walk_villages.gd) of this stop at this seed is loaded when there
+## is one; otherwise the village is planned live (WalkVillage.plan: the
+## stop's spec, its programme plus `extras`, the lot planner,
+## VillageAssembler), which takes minutes. Every mesh is made solid. On given
+## ground the rig's flat plane is put away and the village's own ground is
+## walked; on flat ground the plane stays under it.
+func _generate_village() -> void:
 	_busy = true
 	_set_buttons(false)
-	var path := _terrain_name
-	if not path.begins_with("res://"):
-		path = "res://tests/fixtures/terrain/%s.json" % _terrain_name
-		if not FileAccess.file_exists(path):
-			path = "res://tests/fixtures/terrain/real30/%s.json" % _terrain_name
-	var ground := VillageCharacterCheck.apply(VillageTerrain.from_file(path), _terrain_name)
-	if not ground.valid():
-		_status.text = "No terrain %s (%s)." % [_terrain_name, path]
-		_busy = false
-		_set_buttons(true)
-		return
+	var stop := _village
 	var v_seed := int(_seed_spin.value)
-	_status.text = "Planning a village on %s, seed %d… (two minutes or so)" % [_terrain_name, v_seed]
-	await get_tree().process_frame
-	await get_tree().process_frame
+	_terrain_name = String(stop.get("terrain", ""))
 	var t0 := Time.get_ticks_msec()
-	var spec := VillageSpec.new(v_seed)
-	spec.population = 40
-	spec.terrain = ground
-	spec.generate(v_seed)
-	var jobs: Array[Dictionary] = VillageLotPlanner.measure_all(VillageProgrammer.programme(spec))
-	var plan := VillageLotPlanner.plan_measured(spec, jobs)
-	if plan.ground == null or plan.buildings.is_empty():
-		_status.text = "The village was not planned on %s." % _terrain_name
-		_busy = false
-		_set_buttons(true)
-		return
+	var baked := {}
+	if not _cutaway.button_pressed and not _live:
+		baked = WalkVillage.load_bake(_bake_base(v_seed), stop)
+	var root: Node3D
+	var rows: Array[Dictionary] = []
+	var meta: Dictionary
+	if not baked.is_empty():
+		root = baked["root"]
+		rows = baked["rows"]
+		meta = baked["meta"]
+	else:
+		_status.text = "Planning %s village on %s, seed %d, live (not baked: this takes minutes)…" % [
+			String(stop.get("culture", "a")), WalkVillage.where(stop), v_seed]
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var planned := WalkVillage.plan(stop, v_seed)
+		if planned.has("error"):
+			_status.text = String(planned["error"]) + " Save & new seed tries another."
+			_busy = false
+			_set_buttons(true)
+			return
+		root = VillageAssembler.build(planned["plan"], _cutaway.button_pressed)
+		rows = WalkVillage.rows_of(planned["plan"], planned["extras"])
+		meta = WalkVillage.meta_of(stop, v_seed, planned)
 	if _building_root != null:
 		_building_root.queue_free()
 	_clear_pins()
 	_building = null
-	_request = BuildingRequest.from_dict({"kind": "village", "seed": v_seed})
-	_building_root = VillageAssembler.build(plan, _cutaway.button_pressed)
+	_village_rows = rows
+	_village_meta = meta
+	_request = BuildingRequest.village(v_seed, int(meta.get("population", 40)),
+		StringName(meta.get("culture", "english")), StringName(meta.get("purpose", "farming")),
+		float(meta.get("wealth", 0.4)))
+	_building_root = root
 	_solidify(_building_root)
 	_world.add_child(_building_root)
-	_ground.visible = false
-	(_ground.get_child(0) as CollisionShape3D).disabled = true
 	_water_plane.visible = false
-	# outside the first building's door, on its lot's front, on the village's
-	# own ground (a lot is turned, so the rig's "-Z is the front" does not hold)
-	var first: Dictionary = plan.buildings[0]
-	var door: Vector3 = first.get("door", Vector3.ZERO)
-	var xf: Transform3D = first.get("transform", Transform3D.IDENTITY)
-	var front := xf.basis * Vector3(0, 0, -1)
-	front = Vector3(front.x, 0, front.z).normalized()
-	var spot := door + front * 3.0
-	var gy := VillageBuilder.ground_height(plan, Vector2(spot.x, spot.z))
-	_placement = {"door": door, "front": front, "ray_top": gy + 2.5,
-		"bounds": AABB(Vector3(door.x - 20, gy - 40, door.z - 20), Vector3(40, 120, 40))}
-	_info.text = "Village on %s · %s · %d buildings · seed %d" % [_terrain_name,
-		spec.form, plan.buildings.size(), v_seed]
-	_status.text = "Built in %.1f s. You start at the first building's door." % (
-		(Time.get_ticks_msec() - t0) / 1000.0)
+	if meta.get("on_terrain", false):
+		_ground.visible = false
+		(_ground.get_child(0) as CollisionShape3D).disabled = true
+	else:
+		_ground.visible = true
+		(_ground.get_child(0) as CollisionShape3D).disabled = false
+		_ground.transform = Transform3D(Basis.IDENTITY, Vector3(0, -0.05, 0))
+	_village_list.clear()
+	for i in rows.size():
+		_village_list.add_item("%d. %s%s" % [i, _building_label(rows[i]["request"]),
+			"  (extra)" if rows[i]["extra"] else ""])
+	_village_list.visible = true
+	_village_label.visible = true
+	var title := String(stop.get("why", ""))
+	_info.text = "%s%s %s village on %s · %s form · %d buildings (%d of %d extras placed) · seed %d" % [
+		title + "\n" if title != "" else "", String(meta.get("culture", "")).capitalize(),
+		meta.get("purpose", ""), meta.get("where", ""), meta.get("form", ""), rows.size(),
+		int(meta.get("extras_placed", 0)), int(meta.get("extras", 0)), v_seed]
+	if not baked.is_empty():
+		_info.text += "\nBaked %s at %s" % [String(meta.get("baked_at", "?")).substr(0, 16),
+			meta.get("commit", "?")]
+		if String(meta.get("commit", "")) != WalkVillage.git_head():
+			_info.text += " — HEAD is now %s: re-bake before trusting a pin" % WalkVillage.git_head()
+	_status.text = "%s in %.0f s. Double-click a building in the list to go to its door." % [
+		"Loaded the bake" if not baked.is_empty() else "Planned and built live",
+		(Time.get_ticks_msec() - t0) / 1000.0]
 	await get_tree().physics_frame
 	await get_tree().physics_frame
-	_respawn()
+	_go_to_building(_landmark_index())
 	_busy = false
 	_set_buttons(true)
+
+
+func _bake_base(v_seed: int) -> String:
+	if _series_name != "" and _village.has("series_stop"):
+		return WalkVillage.bake_base(_series_name, int(_village["series_stop"]), v_seed)
+	return WalkVillage.bake_base("terrain", 0, v_seed).replace("00_", _terrain_name + "_")
+
+
+static func _building_label(req: BuildingRequest) -> String:
+	var s := "%s %s" % [req.style, req.kind]
+	if String(req.purpose) not in ["", "none"]:
+		s += " (%s)" % req.purpose
+	return s
+
+
+## Start where the village is most worth seeing: its church, temple or
+## castle, else its first building.
+func _landmark_index() -> int:
+	for kind in [&"church", &"temple", &"castle"]:
+		for i in _village_rows.size():
+			if (_village_rows[i]["request"] as BuildingRequest).kind == kind:
+				return i
+	return 0
+
+
+## Stand outside building i's door, on its lot's front (a lot is turned, so
+## the rig's "-Z is the front" does not hold). R comes back here.
+func _go_to_building(i: int) -> void:
+	if i < 0 or i >= _village_rows.size():
+		return
+	var row: Dictionary = _village_rows[i]
+	var xf: Transform3D = row["transform"]
+	var door: Vector3 = row["door"]
+	var front := xf.basis * Vector3(0, 0, -1)
+	front = Vector3(front.x, 0, front.z).normalized()
+	_placement = {"door": door, "front": front, "ray_top": door.y + 2.5,
+		"bounds": AABB(Vector3(door.x - 20, door.y - 40, door.z - 20), Vector3(40, 120, 40))}
+	_fly = false
+	_respawn()
+	_village_list.select(i)
+	_status.text = "At %d. %s." % [i, _building_label(row["request"])]
+
+
+## The village building under the crosshair, for the HUD.
+func _crosshair_building() -> String:
+	var c := _sv.size / 2.0
+	var from := _cam.project_ray_origin(c)
+	var q := PhysicsRayQueryParameters3D.create(from, from + _cam.project_ray_normal(c) * 150.0)
+	q.exclude = [_player.get_rid()]
+	var hit := _cam.get_world_3d().direct_space_state.intersect_ray(q)
+	if hit.is_empty():
+		return ""
+	var b := _village_building_at(hit["collider"], hit["position"])
+	return String(b.get("label", "the village ground" if _part_name(hit["collider"]).to_lower() == "ground" else ""))
+
+
+## The building a hit belongs to: its index and node under Village/Buildings
+## (named <kind>_<i> by VillageAssembler), its request, the hit in its own
+## frame and the command that opens it alone; or {} for the ground, a tree...
+func _village_building_at(collider: Object, world_pos: Vector3) -> Dictionary:
+	if _village_rows.is_empty() or not (collider is Node):
+		return {}
+	var node := collider as Node
+	while node != null and node != _building_root:
+		var parent := node.get_parent()
+		if parent != null and parent.name == &"Buildings" and node is Node3D:
+			var nm := String(node.name)
+			var i := int(nm.get_slice("_", nm.get_slice_count("_") - 1))
+			if i < 0 or i >= _village_rows.size():
+				return {}
+			var req: BuildingRequest = _village_rows[i]["request"]
+			return {"index": i, "node": nm, "label": "%d. %s" % [i, _building_label(req)],
+				"request": req.to_dict(), "local": _a((node as Node3D).to_local(world_pos)),
+				"reopen": ".\\visualqa\\walk.ps1 " + _building_args(req)}
+		node = parent
+	return {}
+
+
+
+func _leave_village() -> void:
+	_village = {}
+	_village_rows = []
+	_village_meta = {}
+	_terrain_name = ""
+	_village_list.visible = false
+	_village_label.visible = false
+
+
+# --- village series -------------------------------------------------------
+
+func _load_series(series: String) -> String:
+	var path := SERIES_DIR + series.trim_suffix(".json") + ".json"
+	if not FileAccess.file_exists(path):
+		return "No village series " + path
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if data is Dictionary:
+		data = (data as Dictionary).get("stops", [])
+	if not (data is Array) or (data as Array).is_empty():
+		return "Village series %s has no stops." % path
+	_series_name = series.trim_suffix(".json")
+	_series = data
+	_save_next.text = "Save & next village →"
+	_skip.text = "Skip this village (save nothing)"
+	_skip.visible = true
+	_tour_label.visible = true
+	return ""
+
+
+func _enter_village(i: int) -> void:
+	_series_i = i
+	_village = (_series[i] as Dictionary).duplicate(true)
+	_village["series_stop"] = i + 1
+	_seed_spin.value = int(_village.get("seed", 1))
+	_tour_label.text = "Village %d / %d — %s" % [i + 1, _series.size(),
+		String(_village.get("why", "(no why)"))]
+
+
+## Go to the next village of the series; false at its end.
+func _next_village() -> bool:
+	if _series_i + 1 >= _series.size():
+		_tour_label.text = "Series %s finished: %d villages." % [_series_name, _series.size()]
+		return false
+	_enter_village(_series_i + 1)
+	return true
 
 
 # --- tours ---------------------------------------------------------------
@@ -956,6 +1156,12 @@ func _next_stop() -> bool:
 
 func _on_skip() -> void:
 	if _busy:
+		return
+	if _series_name != "":
+		if _next_village():
+			await _generate_village()
+		else:
+			_status.text = "End of the series."
 		return
 	if _next_stop():
 		await _generate()
@@ -1043,10 +1249,13 @@ func _physics_process(delta: float) -> void:
 		return
 	if _filer_pid > 0 and Engine.get_physics_frames() % 30 == 0:
 		_poll_filer()
-	_hud.text = "%s%s%s\n%s" % [
+	if not _village_rows.is_empty() and Engine.get_physics_frames() % 10 == 0:
+		_looking_at = _crosshair_building()
+	_hud.text = "%s%s%s%s\n%s" % [
 		"FLY  " if _fly else "",
 		"lantern  " if _lantern.visible else "",
 		"pins: %d" % _pins.size(),
+		("   looking at: " + _looking_at) if not _village_rows.is_empty() and _looking_at != "" else "",
 		"click to walk · Esc frees mouse" if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED
 			else "right-click: pin a problem"]
 	var input := Vector2.ZERO
@@ -1198,6 +1407,7 @@ func _pin_at(screen_pos: Vector2) -> void:
 		"camera": _cam.global_position,
 		"look": -_cam.global_transform.basis.z, "image": img,
 		"yaw": _yaw, "pitch": _pitch, "feet": _player.global_position,
+		"building": _village_building_at(hit["collider"], pos),
 	}
 	_recapture = Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -1412,9 +1622,25 @@ func _save(next_kind: bool) -> void:
 		(_checks[f] as CheckBox).button_pressed = false
 	_notes.text = ""
 	var saved := _status.text
-	if _terrain_name != "":
-		_seed_spin.value = randi() % 100000
-		await _generate_terrain_village()
+	# a village series: next village, or this one again with a new seed. A
+	# single building built off the series goes back to the series on "next".
+	if _series_name != "" and next_kind:
+		if not _next_village():
+			_status.text = saved + " End of the series."
+			_save_next.disabled = true
+			_skip.disabled = true
+			return
+		await _generate_village()
+		_status.text = saved + " " + _status.text
+		return
+	if not _village.is_empty():
+		# another seed of this stop that is already baked, else a live one
+		var others: Array[int] = []
+		if _village.has("series_stop"):
+			others = WalkVillage.baked_seeds(_series_name, int(_village["series_stop"]))
+		others.erase(int(_seed_spin.value))
+		_seed_spin.value = others.pick_random() if not others.is_empty() else randi() % 100000
+		await _generate_village()
 		_status.text = saved + " " + _status.text
 		return
 	if _tour_name != "" and next_kind:
@@ -1436,7 +1662,10 @@ func _save(next_kind: bool) -> void:
 func _building_name() -> String:
 	if _building != null:
 		return _building.name()
-	return "Village on %s" % _terrain_name
+	if _village_meta.is_empty():
+		return "Village on %s" % _terrain_name
+	return "%s %s village on %s" % [String(_village_meta.get("culture", "")).capitalize(),
+		_village_meta.get("purpose", ""), _village_meta.get("where", "")]
 
 
 ## Append one review to the rating file, its screenshots beside it, and the
@@ -1464,6 +1693,9 @@ func _write_review() -> String:
 	if _tour_name != "" and not _base.is_empty():
 		md.append("Tour: %s, stop %d / %d — %s\n\n" % [_tour_name, _tour_i + 1, _tour.size(),
 			String(_base.get("why", ""))])
+	if _series_name != "" and not _village.is_empty():
+		md.append("Village series: %s, village %d / %d — %s\n\n" % [_series_name, _series_i + 1,
+			_series.size(), String(_village.get("why", ""))])
 	var flags := {}
 	for f in FIELDS:
 		flags[f] = (_checks[f] as CheckBox).button_pressed
@@ -1490,6 +1722,10 @@ func _write_review() -> String:
 		md.append("   - at %s (building-local), normal %s, hit `%s`%s\n" % [
 			_v(pin["pos"]), _v(pin["normal"]), pin["part"],
 			", room: " + pin["room"] if pin["room"] != "" else ""])
+		var hit_b: Dictionary = pin.get("building", {})
+		if not hit_b.is_empty():
+			md.append("   - building %s, at %s in its own frame; alone: `%s`\n" % [
+				hit_b["label"], hit_b["local"], hit_b["reopen"]])
 		if pin["plan"] != "":
 			md.append("   - plan: %s\n" % pin["plan"])
 		md.append("   - camera %s looking %s\n" % [_v(pin["camera"]), _v(pin["look"])])
@@ -1497,7 +1733,7 @@ func _write_review() -> String:
 		rows.append({"n": pin["n"], "kind": pin["kind"], "severity": pin["severity"], "note": pin["note"],
 			"pos": _a(pin["pos"]), "normal": _a(pin["normal"]), "part": pin["part"],
 			"room": pin["room"], "plan": pin["plan"], "camera": _a(pin["camera"]), "look": _a(pin["look"]),
-			"screenshot": "walk_shots/" + shot})
+			"screenshot": "walk_shots/" + shot, "building": pin.get("building", {})})
 	md.append("<!-- /human-walk %s -->\n\n" % id)
 
 	if not FileAccess.file_exists(rate_path):
@@ -1522,6 +1758,10 @@ func _write_review() -> String:
 			record["why"] = String(_base.get("why", ""))
 		if _terrain_name != "":
 			record["village_terrain"] = _terrain_name
+		if not _village.is_empty() and _series_name != "":
+			record["village_series"] = _series_name
+			record["stop"] = _series_i + 1
+			record["why"] = String(_village.get("why", ""))
 		err = _upsert_jsonl(jsonl, id, JSON.stringify(record))
 		if err != "":
 			return err

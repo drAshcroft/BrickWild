@@ -1,0 +1,119 @@
+{
+  "about": "The default walk: a series of villages that between them hold every church, castle, house, temple and windmill style the library publishes, and a wide spread of shops. Each stop is a VillageSpec (culture, purpose, population, wealth, water, enclosure, optional terrain fixture, seed) plus `extras`: request dicts added to the village's own programme. A dict names only what it means; BuildingRequest.from_dict fills the kind's defaults, and a dict without a seed takes one from the village seed.",
+  "stops": [
+    {
+      "why": "English mill village on a stream: thatch, a rich house, post and tower mills, a wizard's tower",
+      "culture": "english", "purpose": "mill", "population": 50, "wealth": 0.5, "water": "stream", "seed": 1,
+      "extras": [
+        {"kind": "windmill", "style": "post"},
+        {"kind": "windmill", "style": "tower"},
+        {"kind": "house", "style": "thatch_cottage"},
+        {"kind": "house", "style": "rich", "storeys": 2},
+        {"kind": "castle", "style": "wizard", "width": 22, "length": 24}
+      ]
+    },
+    {
+      "why": "Frankish market: a gothic church beside the romanesque one, a restaurant, a library, a basilica temple",
+      "culture": "frankish", "purpose": "market", "population": 70, "wealth": 0.6, "seed": 2,
+      "extras": [
+        {"kind": "church", "style": "gothic"},
+        {"kind": "shop", "style": "townhouse", "purpose": "restaurant"},
+        {"kind": "shop", "style": "rich", "purpose": "library"},
+        {"kind": "windmill", "style": "smock"},
+        {"kind": "temple", "style": "basilica", "purpose": "blood"}
+      ]
+    },
+    {
+      "why": "Norse fishing strand on the coast: longhalls, a roundhouse, a stave church, a dark keep",
+      "culture": "norse", "purpose": "fishing", "population": 45, "water": "coast", "seed": 3,
+      "extras": [
+        {"kind": "church", "style": "nordic_stave"},
+        {"kind": "house", "style": "roundhouse"},
+        {"kind": "shop", "style": "longhall", "purpose": "thieves_den"},
+        {"kind": "castle", "style": "dark", "width": 24, "length": 26}
+      ]
+    },
+    {
+      "why": "Alpine farming green: farmhouses, a renaissance church, a Bavarian castle, a sky castle, a bathhouse",
+      "culture": "alpine", "purpose": "farming", "population": 60, "wealth": 0.5, "seed": 4,
+      "extras": [
+        {"kind": "castle", "style": "bavarian", "width": 30, "length": 34},
+        {"kind": "castle", "style": "sky", "width": 22, "length": 24},
+        {"kind": "shop", "style": "farmhouse", "purpose": "bathhouse"},
+        {"kind": "house", "style": "farmhouse", "purpose": "farmer"}
+      ]
+    },
+    {
+      "why": "Moorish crossroads: townhouses, pueblo houses, a byzantine church, a ziggurat, an alchemist, a paddle mill",
+      "culture": "moorish", "purpose": "crossroads", "population": 50, "seed": 5,
+      "extras": [
+        {"kind": "church", "style": "byzantine"},
+        {"kind": "house", "style": "pueblo"},
+        {"kind": "house", "style": "pueblo"},
+        {"kind": "shop", "style": "townhouse", "purpose": "alchemist_laboratory"},
+        {"kind": "temple", "style": "ziggurat", "purpose": "serpent"},
+        {"kind": "windmill", "style": "paddle"}
+      ]
+    },
+    {
+      "why": "Eastern pilgrim village: a pylon temple, a russian church, a japanese castle, an elven hall, a school",
+      "culture": "eastern", "purpose": "pilgrim", "population": 50, "seed": 6,
+      "extras": [
+        {"kind": "church", "style": "russian"},
+        {"kind": "castle", "style": "japanese", "width": 28, "length": 30},
+        {"kind": "castle", "style": "elven", "width": 22, "length": 24},
+        {"kind": "shop", "style": "asian", "purpose": "school"}
+      ]
+    },
+    {
+      "why": "Blighted forest hamlet: witch huts round a stepped shrine, a bone rotunda, a prison, a crusader hold",
+      "culture": "blighted", "purpose": "forest", "population": 30, "seed": 7,
+      "extras": [
+        {"kind": "temple", "style": "rotunda", "purpose": "bone"},
+        {"kind": "shop", "style": "witch_hut", "purpose": "prison"},
+        {"kind": "castle", "style": "crusader", "width": 26, "length": 28}
+      ]
+    },
+    {
+      "why": "Mediterranean village on Manarola's real cliffs: terraces, stair streets, a hospice",
+      "culture": "mediterranean", "purpose": "fishing", "terrain": "manarola", "population": 40, "seed": 8,
+      "extras": [
+        {"kind": "shop", "style": "mediterranean", "purpose": "hospice"}
+      ]
+    },
+    {
+      "why": "East Asian mining village: asian houses, a scholar, a market hall, a void pylon, an Edwardian keep",
+      "culture": "east_asian", "purpose": "mining", "population": 50, "seed": 9,
+      "extras": [
+        {"kind": "house", "style": "asian", "purpose": "scholar"},
+        {"kind": "shop", "style": "asian", "purpose": "market_hall"},
+        {"kind": "temple", "style": "pylon", "purpose": "void"},
+        {"kind": "castle", "style": "edwardian", "width": 30, "length": 34}
+      ]
+    },
+    {
+      "why": "Saharan garrison: African houses round a moorish castle, barracks, a flame rotunda, a windpump",
+      "culture": "saharan", "purpose": "garrison", "population": 60, "seed": 10,
+      "extras": [
+        {"kind": "shop", "style": "african", "purpose": "barracks"},
+        {"kind": "temple", "style": "rotunda", "purpose": "flame"},
+        {"kind": "windmill", "style": "windpump"},
+        {"kind": "castle", "style": "norman", "width": 26, "length": 28}
+      ]
+    },
+    {
+      "why": "Alpine village on Masouleh's real slope: stacked roofs, a stepped through road",
+      "culture": "alpine", "purpose": "crossroads", "terrain": "masouleh", "population": 40, "seed": 11,
+      "extras": []
+    },
+    {
+      "why": "A rich English market town with a palace, a guildhall and a grand hotel (the hotel alone is ~45 s)",
+      "culture": "english", "purpose": "market", "population": 90, "wealth": 0.8, "enclosure": "hedge", "seed": 12,
+      "extras": [
+        {"kind": "hotel", "style": "grand_budapest"},
+        {"kind": "shop", "style": "rich", "purpose": "palace"},
+        {"kind": "castle", "style": "french_chateau", "width": 30, "length": 34}
+      ]
+    }
+  ]
+}

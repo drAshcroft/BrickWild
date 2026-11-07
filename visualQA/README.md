@@ -24,12 +24,71 @@ while this server is running; restart it after changing the render selection.
 The server listens only on loopback and serves only the selected images and
 the review page. Ctrl+C stops it. Change the port with `--port 8766`.
 
+## Walking villages (Godot) -- the default
+
+```powershell
+.\visualqa\walk.ps1 -Bake                 # once per commit, in the background: hours
+.\visualqa\walk.ps1                       # walk the series 'mixed'
+.\visualqa\walk.ps1 --villages=mixed --stop=5 [--seed=7] [--live]
+.\visualqa\walk.ps1 -Villages smoke       # a one-hamlet series for checking the rig
+```
+
+With no `--kind`, `--tour` or `--village-terrain` the rig walks a **village
+series**: `visualqa/villages/<name>.json`, one village per stop. Between them
+the twelve villages of `mixed` hold every church, castle, house, temple and
+windmill style the library publishes, a wide spread of shop businesses, two
+real-ground sites (Manarola, Masouleh) and one hotel. A stop is
+
+```json
+{"why": "...", "culture": "norse", "purpose": "fishing", "population": 45,
+ "wealth": 0.4, "water": "coast", "enclosure": "none", "terrain": "manarola",
+ "seed": 3, "extras": [{"kind": "church", "style": "nordic_stave"},
+                       {"kind": "castle", "style": "dark", "width": 24, "length": 26}]}
+```
+
+Every field is optional. The village is planned the way the suites plan one
+(`VillageSpec` -> `VillageProgrammer.programme` -> `VillageLotPlanner` ->
+`VillageAssembler`); `extras` are request dicts (anything
+`BuildingRequest.from_dict` takes; missing fields are the kind's defaults, a
+missing seed comes from the village seed) **added to the village's own
+programme**, so a village holds kinds its culture would never build. The
+sidebar says how many extras found a lot. The code is
+`visualqa/walk/walk_village.gd`, shared by the rig and the baker.
+
+**Bake first.** A village is slow: measured 1 Nov, measuring 22 buildings took
+452 s (one witch hut alone 217 s; it is the furnisher) and the assembler then
+generates every building again (268 s for six). So
+`tools/bake_walk_villages.gd` (what `-Bake` runs; not headless, the dummy
+renderer keeps no meshes) plans and assembles each stop once and saves
+`artifacts/walk_villages/<series>/<NN>_seed<S>.scn` + `.json` (the building
+rows: request, transform, door). The rig loads a bake in seconds and plans
+live only what is not baked (or with `--live`, or with Cutaway ticked). A bake
+of an edited stop is ignored. A bake from another commit is still used, but the
+sidebar says "HEAD is now ...: re-bake before trusting a pin". The commit is
+read from `.git`, so uncommitted changes are not noticed. `-Bake` skips what is
+already baked at this commit; pass `--force` to re-bake, `--stops=1,4` or
+`--seeds=1,2,3` to choose.
+
+In a village:
+
+- you start at its church, temple or castle; the **Buildings** list holds every
+  building (`(extra)` marks the added ones). Double-click one to stand at its
+  door; R comes back to it;
+- the HUD says which building is under the crosshair;
+- **a pin names the building it hit**: lot index, request, the hit in the
+  building's own frame, and a command that opens that building alone. The
+  filer routes the todo by that building (a furniture pin in a village house
+  still goes to `house_furnisher.gd`) and titles it `<village> / <n. building>`;
+- **Save & next village** saves and loads the next stop. **Save & new seed**
+  takes another baked seed of the same stop if there is one, else plans a
+  random seed live. **Skip** moves on. **Build** builds the sidebar's single
+  building and steps off the series; "Save & next village" goes back to it.
+
 ## Walking a building (Godot)
 
 The images cannot be entered. The walk rig can:
 
 ```powershell
-.\visualqa\walk.ps1
 .\visualqa\walk.ps1 --kind=house --seed=8102 --style=cottage
 ```
 

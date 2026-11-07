@@ -54,6 +54,14 @@ def target_file(request, pin_kind):
     return ""
 
 
+def pin_request(review, pin):
+    """The request a pin is about: the building it hit in a village, else the review's."""
+    b = pin.get("building") or {}
+    if b.get("request") and not str(pin.get("kind", "")).startswith("ground"):
+        return b["request"]
+    return review.get("request", {})
+
+
 def _num(v):
     f = float(v)
     return str(int(f)) if f == int(f) else ("%g" % f)
@@ -93,15 +101,26 @@ def describe(review, pin, shots_dir):
         "Note: " + note,
         "Kind: %s; severity: %s" % (pin.get("kind", "?"), pin.get("severity", "unset (old pin)")),
     ]
-    if review.get("why"):
+    if review.get("village_series"):
+        lines.append("Village %s of series %s (%s)" % (review.get("stop", "?"),
+                     review["village_series"], review.get("why", "")))
+    elif review.get("why"):
         lines.append("Tour stop: %s (%s)" % (review.get("stop", "?"), review["why"]))
+    b = pin.get("building") or {}
+    if b:
+        lines.append("Building in the village: %s (lot %s), at %s in its own frame" % (
+            b.get("label", "?"), b.get("index", "?"), b.get("local")))
+        lines.append("Building request: " + json.dumps(b.get("request", {}), sort_keys=True))
+        if b.get("reopen"):
+            lines.append("Reopen that building alone: " + b["reopen"])
     if pin.get("room"):
         lines.append("Room: " + str(pin["room"]))
     if pin.get("part"):
         lines.append("Part hit: " + str(pin["part"]))
     if pin.get("plan"):
         lines.append("Plan records: " + str(pin["plan"]))
-    lines.append("Building-local position: %s, normal %s" % (pin.get("pos"), pin.get("normal")))
+    frame = "Village-local" if str(review.get("request", {}).get("kind", "")) == "village" else "Building-local"
+    lines.append("%s position: %s, normal %s" % (frame, pin.get("pos"), pin.get("normal")))
     lines.append("Camera %s looking %s" % (pin.get("camera"), pin.get("look")))
     if pin.get("screenshot"):
         lines.append("Screenshot: " + os.path.relpath(
@@ -117,7 +136,11 @@ def title(review, pin):
     note = " ".join(str(pin.get("note", "")).split()) or "(no note)"
     if len(note) > 60:
         note = note[:59].rstrip() + "…"
-    return "%s: %s — %s" % (review.get("name", "?"), pin.get("kind", "?"), note)
+    where = review.get("name", "?")
+    b = pin.get("building") or {}
+    if b.get("label"):
+        where += " / " + str(b["label"])
+    return "%s: %s — %s" % (where, pin.get("kind", "?"), note)
 
 
 class Todos:
@@ -205,7 +228,7 @@ def main(argv=None):
                         "--description", describe(review, pin, shots_dir),
                         "--priority", PRIORITY.get(str(pin.get("severity", "")), "P2"),
                         "--phase", PHASE]
-                target = target_file(review.get("request", {}), str(pin.get("kind", "")))
+                target = target_file(pin_request(review, pin), str(pin.get("kind", "")))
                 if target:
                     args += ["--target-file", target]
                 if a.dry_run:
