@@ -41,6 +41,23 @@ func _init() -> void:
 		if not ResourceLoader.exists(PropCatalog.scene_path(key)):
 			printerr("prop resource missing: %s" % key)
 			failed = true
+	# VILLAGE-VERNACULAR: the regional dataset is a JSON file beside the village
+	# scripts, not a script -- it ships only by the manifest's `files` entry, so
+	# prove it arrived, and that a regional look reaches a house
+	var regions := VillageVernacular.region_ids()
+	for want in [&"provence", &"cyclades", &"norse", &"japanese"]:
+		if not want in regions:
+			printerr("vernacular region missing from the addon: %s (have %s)" % [want, regions])
+			failed = true
+	if &"cyclades" in regions:
+		var g := VillageVernacular.house_of_type(&"cyclades", "cube", "smoke")
+		var regional := BuildingRequest.house(108, g["style"], &"none", 7.0, 9.0, 2.6, 1)
+		regional.look = g["look"]
+		var built := BrickWild.generate(regional)
+		if not built.is_ok() or (built.spec as HouseSpec).roof_type != &"flat" \
+				or (built.spec as HouseSpec).wall_color.to_html(false) != String(g["look"]["wall"][0]):
+			printerr("a regional look did not reach its house: %s" % [built.errors])
+			failed = true
 	var repeat := BrickWild.generate(BuildingRequest.church(101))
 	if repeat.name() != BrickWild.generate(BuildingRequest.church(101)).name():
 		printerr("same-seed generation was not deterministic")

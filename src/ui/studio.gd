@@ -71,6 +71,22 @@ var decoration_slider: HSlider
 var upkeep_slider: HSlider
 var decoration_label: Label
 var upkeep_label: Label
+## VILLAGE-VERNACULAR (docs/VILLAGE_VERNACULAR.md, docs/STUDIO_VILLAGE.md):
+## the region, an optional second region and its share, coherence, and where
+## the roofs and the paint come from. Every list is the descriptor's
+## (`describe_kind(&"village")["vernacular"]`); "" means none / the blend.
+var region_opt: OptionButton
+var blend_opt: OptionButton
+var share_slider: HSlider
+var coherence_slider: HSlider
+var roofs_opt: OptionButton
+var paint_opt: OptionButton
+var region_label: Label
+var blend_label: Label
+var share_label: Label
+var coherence_label: Label
+var roofs_label: Label
+var paint_label: Label
 
 
 func _ready() -> void:
@@ -137,8 +153,11 @@ func _add_landscape_controls() -> void:
 	period_spin.value = 1200.0
 	generate_button = Button.new()
 	generate_button.text = "Generate"
+	_add_vernacular_controls()
 	for control in [water_label, water_opt, edge_label, edge_opt,
 			decoration_label, decoration_slider, upkeep_label, upkeep_slider,
+			region_label, region_opt, blend_label, blend_opt, share_label, share_slider,
+			coherence_label, coherence_slider, roofs_label, roofs_opt, paint_label, paint_opt,
 			orientation_label, orientation_spin, period_label, period_spin,
 			seed_label, seed_input, shuffle, generate_button]:
 		grid.add_child(control)
@@ -154,6 +173,124 @@ func _add_landscape_controls() -> void:
 		regenerate())
 
 
+func _add_vernacular_controls() -> void:
+	region_label = Label.new()
+	region_label.text = "Region"
+	blend_label = Label.new()
+	blend_label.text = "Blend with"
+	share_label = Label.new()
+	coherence_label = Label.new()
+	roofs_label = Label.new()
+	roofs_label.text = "Roofs from"
+	paint_label = Label.new()
+	paint_label.text = "Paint from"
+	region_opt = OptionButton.new()
+	blend_opt = OptionButton.new()
+	roofs_opt = OptionButton.new()
+	paint_opt = OptionButton.new()
+	region_opt.tooltip_text = "Build the village from a region of the vernacular dataset: its house types by wealth, colours, roofs, church, plants, ground and names. None is the culture alone."
+	blend_opt.tooltip_text = "A second region to blend in. Each house draws its type, walls, trim and roof from one region or the other."
+	roofs_opt.tooltip_text = "Take every roof from one region, whatever the houses are. A house that cannot build that region's roof form keeps its own form, in that region's material and colour."
+	paint_opt.tooltip_text = "Take the walls and the trim from one region: one people's paint on another's houses."
+	share_slider = HSlider.new()
+	coherence_slider = HSlider.new()
+	for slider in [share_slider, coherence_slider]:
+		slider.custom_minimum_size = Vector2(120, 20)
+		slider.min_value = 0.0
+		slider.max_value = 1.0
+		slider.step = 0.05
+		slider.value_changed.connect(func(_v): _controls_changed())
+	share_slider.value = 0.5
+	share_slider.tooltip_text = "How much of the village the second region gets."
+	for opt in [region_opt, blend_opt, roofs_opt, paint_opt]:
+		opt.item_selected.connect(func(_i): _controls_changed())
+
+
+## Fill the region lists from the village descriptor: "" first (none, or "the
+## blend" for the group pickers), then every region with its summary as the
+## item's tooltip.
+func _fill_vernacular(cfg: Dictionary) -> void:
+	var v: Dictionary = cfg.get("vernacular", {})
+	var regions: Array = v.get("regions", [])
+	for pair in [[region_opt, "None (the culture alone)"], [blend_opt, "No blend"],
+			[roofs_opt, "The blend"], [paint_opt, "The blend"]]:
+		var opt: OptionButton = pair[0]
+		opt.clear()
+		opt.add_item(String(pair[1]))
+		opt.set_item_metadata(0, &"")
+		for row in regions:
+			opt.add_item(String(row["label"]))
+			opt.set_item_metadata(opt.item_count - 1, StringName(row["id"]))
+			opt.set_item_tooltip(opt.item_count - 1, String(row.get("summary", "")))
+		opt.select(0)
+	var c: Dictionary = v.get("coherence", {})
+	coherence_slider.min_value = float(c.get("min", 0.0))
+	coherence_slider.max_value = float(c.get("max", 1.0))
+	coherence_slider.value = float(c.get("value", 0.0))
+	coherence_slider.tooltip_text = "%s (0) through %s (1): the chance a house takes everything from one region." % [
+		c.get("min_label", "One hybrid people"), c.get("max_label", "Peoples side by side")]
+	share_slider.value = 0.5
+
+
+static func _picked(opt: OptionButton) -> StringName:
+	if opt.item_count == 0 or opt.selected < 0:
+		return &""
+	var meta = opt.get_item_metadata(opt.selected)
+	return meta if meta != null else &""
+
+
+## The request's `vernacular` from the controls: {} with no region; a plain
+## {region: 1} for one region and nothing else; else {blend, groups,
+## coherence}. A second region that is the first, or a share of 0, is no blend.
+func vernacular() -> Dictionary:
+	var first := _picked(region_opt)
+	if first == &"":
+		return {}
+	var second := _picked(blend_opt)
+	var share := share_slider.value
+	var blend := {String(first): 1.0}
+	var blended := second != &"" and second != first and share > 0.0
+	if blended:
+		blend = {String(first): 1.0 - share, String(second): share} if share < 1.0 else {String(second): 1.0}
+	var groups := {}
+	var roofs := _picked(roofs_opt)
+	if roofs != &"":
+		groups["roofs"] = {String(roofs): 1.0}
+	var paint := _picked(paint_opt)
+	if paint != &"":
+		groups["walls"] = {String(paint): 1.0}
+		groups["trim"] = {String(paint): 1.0}
+	var coherence := coherence_slider.value if blended else 0.0
+	if groups.is_empty() and coherence <= 0.0 and blend.size() == 1:
+		return blend
+	var out := {"blend": blend}
+	if not groups.is_empty():
+		out["groups"] = groups
+	if coherence > 0.0:
+		out["coherence"] = coherence
+	return out
+
+
+## Show what the chosen region can be blended with, and say the share and
+## coherence in words. Hidden for every kind but a village.
+func _sync_vernacular() -> void:
+	var village := _kind() == VILLAGE
+	var regional := village and _picked(region_opt) != &""
+	var second := _picked(blend_opt)
+	var blended := regional and second != &"" and second != _picked(region_opt)
+	region_label.visible = village
+	region_opt.visible = village
+	for control in [blend_label, blend_opt, roofs_label, roofs_opt, paint_label, paint_opt]:
+		control.visible = regional
+	for control in [share_label, share_slider, coherence_label, coherence_slider]:
+		control.visible = blended
+	if blended:
+		# the short name: the full label widened the panel over the preview
+		share_label.text = "%s share: %d%%" % [blend_opt.get_item_text(blend_opt.selected).get_slice(" (", 0),
+			roundi(share_slider.value * 100.0)]
+		coherence_label.text = "Coherence: %.2f" % coherence_slider.value
+
+
 func _controls_changed() -> void:
 	if _suspend_regen:
 		return
@@ -163,6 +300,7 @@ func _controls_changed() -> void:
 		length_label.text = "%s: %d" % [descriptor["length_label"], int(length_slider.value)]
 		decoration_label.text = "Decoration: %.2f" % decoration_slider.value
 		upkeep_label.text = "Upkeep: %.2f" % upkeep_slider.value
+		_sync_vernacular()
 		info_label.text = "Choose Grow village to apply these settings."
 	else:
 		regenerate()
@@ -285,6 +423,8 @@ func _on_kind_changed() -> void:
 		edge_label.text = cfg["enclosure_label"]
 		_fill(water_opt, _options(&"water"))
 		_fill(edge_opt, _options(&"enclosure"))
+		_fill_vernacular(cfg)
+	_sync_vernacular()
 	generate_button.text = "Grow village" if village else "Generate"
 	_suspend_regen = false
 	if village:
@@ -366,6 +506,7 @@ func _request(seed_value: int) -> BuildingRequest:
 		request.enclosure = edge_opt.get_item_metadata(edge_opt.selected)
 		request.decoration_level = decoration_slider.value
 		request.upkeep = upkeep_slider.value
+		request.vernacular = vernacular()
 	return request
 
 
@@ -433,8 +574,11 @@ func _temple_sheet(s: TempleSpec) -> String:
 func _describe(s) -> String:
 	if s is VillageSpec:
 		var plan: VillagePlan = plans[current]
+		# a regional village is its blend, not the default culture it carries
+		var fs: VillageVernacular = s.feature_set()
+		var people: String = fs.label() if fs != null else String(s.culture)
 		return "%s -- a %s village of %d, %s, %s\n%d households, %d buildings on a %.0f x %.0f m site" % [
-			s.variant_name, String(s.form), s.population, String(s.culture),
+			s.variant_name, String(s.form), s.population, people,
 			String(s.purpose), s.households, plan.buildings.size(), plan.site.size.x, plan.site.size.y]
 	if s is TempleSpec:
 		return "%s -- %s of %s\n%.0f x %.0f m, %.0f m to the ceiling, %.0f m to the crown of the god" % [

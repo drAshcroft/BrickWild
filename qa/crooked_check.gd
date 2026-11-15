@@ -16,7 +16,7 @@ extends RefCounted
 ##
 ## A defect is returned as text, one line each; an empty list is a pass.
 
-const Integrity := preload("res://qa/mesh_integrity_check.gd")
+const Integrity := MeshIntegrityCheck   # a class: res://qa/... is runtime/qa/ in the addon
 const DET_TOL := 1e-4
 const Y_TOL := 1e-4
 

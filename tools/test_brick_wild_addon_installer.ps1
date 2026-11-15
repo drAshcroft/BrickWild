@@ -20,6 +20,31 @@ if (-not $fixture.StartsWith($expectedPrefix, [StringComparison]::OrdinalIgnoreC
     throw "Refusing unsafe fixture path: $fixture"
 }
 
+# A shipped script must not name a repository-only path: in the addon src/ is
+# families/, qa/ is runtime/qa/, so a load of 'res://src/...' compiles here and
+# breaks every village script in a consumer project (lot_planner.gd's street-net
+# preload did, found releasing 0.1.6). Preload beside the script by a relative
+# path, or reach the script through a class_name. Checked without Godot, so it
+# runs on every pass of this test, not only with -GodotPath.
+$shippedManifest = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'brick_wild_addon_manifest.json')) | ConvertFrom-Json
+$repoPathLoads = @()
+foreach ($tree in @($shippedManifest.script_trees)) {
+    $dir = Join-Path (Join-Path $PSScriptRoot '..') ([string]$tree.source)
+    foreach ($file in Get-ChildItem -LiteralPath $dir -File -Filter '*.gd') {
+        $n = 0
+        foreach ($line in [IO.File]::ReadAllLines($file.FullName)) {
+            $n++
+            $code = $line.Split('#')[0]
+            if ($code -match '(pre)?load\(\s*"res://(src|core|qa)/') {
+                $repoPathLoads += "$($tree.source)/$($file.Name):$n"
+            }
+        }
+    }
+}
+if ($repoPathLoads.Count -gt 0) {
+    throw "Shipped scripts load a repository-only res:// path (they break in the addon):`n  " + ($repoPathLoads -join "`n  ")
+}
+
 function Assert-Equal {
     param($Expected, $Actual, [string]$Message)
     if ($Expected -ne $Actual) {

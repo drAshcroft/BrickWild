@@ -557,7 +557,8 @@ const RETRIES := [[2, 1.0], [4, 1.0], [6, 1.0], [8, 1.0], [10, 1.0], [12, 1.0],
 
 const MAX_EXTRA_LANES := 12
 const FINE_WIDTH_STEPS: Array[float] = [1.05, 1.1, 1.15, 1.2, 1.25]
-const _StreetNet := preload("res://src/village/village_street_net.gd")
+# relative: res://src/... does not exist in the installed addon (RELEASE 0.1.6)
+const _StreetNet := preload("village_street_net.gd")
 
 ## VTER-REAL-FRONTAGE: on the ground's own forms a share of the houses and farms
 ## turn off square to their street, as real ones turn to the contour, the view

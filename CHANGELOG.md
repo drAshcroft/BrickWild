@@ -6,6 +6,127 @@ projects consume that, never this working tree (`docs/RELEASES.md`).
 `BrickWild.API_VERSION` is a separate compatibility number; see `README.md`
 and `docs/PUBLIC_API_TRANSPORT.md`.
 
+## 0.1.6 - 2026-11-15
+
+A village can be built from a real region (Provence, the Cyclades, the Norse
+north, Japan) or a blend of them. Villages stand on real ground, and the
+installed addon compiles again in a consumer project. Tag `v0.1.6`.
+`API_VERSION` stays 2. The new request fields `look` and `vernacular` are
+optional and left out of `to_dict()` when empty, so every older request reads
+and writes the same bytes.
+
+### Notable changes
+
+- **Regional villages** (VILLAGE-VERNACULAR, `docs/VILLAGE_VERNACULAR.md`).
+  `BuildingRequest.vernacular` / `VillageSpec.vernacular` takes a plain
+  `{"provence": 1.0}` or `{"blend": {...}, "groups": {"roofs": {...}},
+  "coherence": 0..1}`.
+  - **The dataset**, `src/village/vernacular_regions.json`, says what is
+    normal for each of four regions, as distributions: wall, trim and roof
+    colour clusters, roof recipes, the house types each wealth tier lives in
+    with their storeys and sizes, the landmark, plants, ground colours, place
+    names, sources, and a short checkable signature.
+  - **The feature set**, `VillageVernacular`, blends regions per feature
+    group. Each house draws its type, walls, trim and roof from one parent, so
+    a blend shows both peoples rather than an average colour. `coherence`
+    chooses between one hybrid people (0) and two peoples side by side (1).
+    `VillageVernacular.register()` adds a fantasy region at run time, validated
+    like the shipped ones.
+  - **Wealth tiers by footprint rank.** Poor paint weathers, and rich
+    households take the bigger types (bastide, captain's house, chieftain's
+    hall, shoya).
+  - **`VillageVernacularCheck`** measures the generated houses against the
+    dataset: membership, the pure region's signature, presence in a blend, and
+    variety.
+  - **Discovery and the Studio.** `describe_kind(&"village")["vernacular"]`
+    publishes the regions, groups and signatures. The Studio has Region, Blend
+    with, share, Coherence, Roofs from and Paint from controls
+    (`docs/STUDIO_VILLAGE.md`).
+- **A house or shop look** (`BuildingRequest.look`, `HouseSpec.look`). A patch
+  over the style's own row: colours, roof form, pitch and material, framing,
+  shutters, chimney, parapet, loggia and eave reach. It may only change a value
+  the row already has, so the generator takes the same draws in the same order.
+  `HouseSpec.look_errors()` and `invalid_look` refuse what a style cannot build.
+  A church or castle takes colours only. A shop's roof follows its look's form
+  (shops always had a gable before).
+- **Villages on real ground** (VTER-*). A real site's character
+  (`VillageTerrain.character`). Back-street loops and turned houses
+  (realism gate 148 -> 166 of 207 cells). Island villages built round their
+  ring (the real Isola dei Pescatori). Valley and gorge villages (Rocamadour,
+  Ushguli). Dispersed hill villages turned to their gentle side. Woods as plan
+  polygons on steep ground. Hillside cross-lanes at a stair's going. A farming
+  or forest village stands back from the water. A capacity estimate and search
+  budget refuse a site early with the best partial plan (BG-012).
+- **Interiors and trades.** Household interior design (`docs/INTERIOR_DESIGN.md`).
+  Shops have trade wares, a bread oven, a second (yard) door, a store off the
+  workshop, and their serving place in the door's view (blacksmith, carpenter,
+  laboratory). Minka, Sahel and roundhouse furnishing vocabularies. The rich
+  house uses its rooms; beds keep their door gap.
+- **Castles.** Walkable stair runs, and newel stairs in tight towers and tower
+  houses. Raised towers get a foot door. Edwardian castles are concentric and
+  elven ones never gated.
+- **Windmills.** The sails' swept disc clears the body, doors are cut and
+  reachable, a post mill is one machine, and a paddle wheel has radial boards.
+  The witch hut's thatch has round eaves, a saddle ridge and rolled verges.
+- **Walk QA** (`visualqa/README.md`). Bug walks with severity, tours and pins
+  filed as todos. Stale bakes are said in red. A bake records the generator
+  as it stood, uncommitted work included. The `vernacular` series (twelve
+  regional villages, each with the check's verdict), and a pinned house
+  reopened alone with its storeys and look.
+
+### Fixes
+
+- **The installed addon did not compile in a consumer project.**
+  `lot_planner.gd` (since 163f3f6), `crooked_check.gd` and
+  `castle_walk_access_check.gd` loaded `res://src/...` and `res://qa/...`
+  paths that exist only in this repository, so every village script failed in
+  `addons/brick_wild`. They now preload beside themselves or reach the script
+  through a class. `tools/test_brick_wild_addon_installer.ps1` scans every
+  shipped tree for such a load without Godot. The addon smoke now proves the
+  regional dataset arrives and a regional look reaches its house.
+- Church panes lap into the window throat (CHURCH-WINDOW-GAP).
+- Coplanar trim decks and stair slabs no longer z-fight (WALK-ZFIGHT).
+- Rafter tails are seated, and flat-roof shops are flat (HOUSE-EAVE-FLOAT).
+- The haystack is a rick, not a 3.4 m pear (VILLAGE-SKEP-SCALE).
+- A failed floor bake retries with grown obstacles, and a walk never publishes
+  a non-finite point (BG-014).
+
+### Compatibility
+
+- **Same seed, different village.** Village layouts changed (street nets,
+  packing, real-ground forms), and so did many houses, shops and castles (the
+  trade and interior work above). Regenerate cached villages and buildings.
+- **Request JSON is unchanged** when `look` and `vernacular` are empty;
+  `schema_version` stays 1. With neither set, the house fingerprint
+  (`tools/fingerprint_houses.gd`, 120 plans) is identical to the commit before
+  them.
+
+### Known issues
+
+- Japan's landmark is a stand-in, the nordic stave church in dark timber
+  (VERN-JAPAN-LANDMARK).
+- The catalogue has no olive, cypress or umbrella pine (VERN-MED-TREES).
+- A region's layout density is its base culture's (VERN-LAYOUT).
+- Provence reads as Mediterranean but not yet as Provence in particular
+  (VERN-PROVENCE-MARKS).
+
+### Lanes
+
+Run on this tree (15 Nov), on a loaded host. The scheduled gates
+(`lane:scheduled`, `library`, `placement`, `houseqafull`) were not run for this
+release.
+
+| Lane | Checks | Result |
+|---|---|---|
+| `vvernacular` | 66 | pass |
+| `vvernacularbuild` | 38 | pass |
+| `lane:village-fast` | 304 | pass |
+| `libraryquick` | 104 | pass |
+| `cultureapi`, `compactapi` | 32 | pass |
+| `tests/studio_village_test.gd` | -- | pass |
+| `tools/test_brick_wild_addon_installer.ps1 -GodotPath ...` | 1083 files | pass, Godot verified |
+| walk bake, `vernacular` series | 12 villages | 12 baked, 12 pass VillageVernacularCheck |
+
 ## 0.1.5 - 2026-10-26
 
 Every house style has its own identity, buildings can be built crooked on

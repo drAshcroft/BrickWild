@@ -62,4 +62,38 @@ func _init() -> void:
 				await process_frame
 			root.get_texture().get_image().save_png("res://artifacts/renders/studio_house_2storey.png")
 			print("wrote studio_house_2storey.png")
+	if "vernacular" in selected:
+		await _shoot_vernacular(ui)
 	quit(0)
+
+
+## VILLAGE-VERNACULAR: the region controls, through the Studio's own pickers.
+## ... -- vernacular  -> docs/screenshots/studio_village_vernacular.png (a
+## Cycladic village) and artifacts/renders/studio_village_blend.png (half Norse,
+## half Japanese).
+func _shoot_vernacular(ui) -> void:
+	for k in range(ui.kind_opt.item_count):
+		if ui.kind_opt.get_item_metadata(k) == &"village":
+			ui.kind_opt.select(k)
+	ui._on_kind_changed()
+	ui.seed_input.text = "42021"
+	ui.width_slider.value = 30
+	ui.length_slider.value = 50
+	for shot in [{"region": "cyclades", "blend": "", "file": "res://docs/screenshots/studio_village_vernacular.png"},
+			{"region": "norse", "blend": "japanese", "file": "res://artifacts/renders/studio_village_blend.png"}]:
+		for pair in [[ui.region_opt, shot["region"]], [ui.blend_opt, shot["blend"]]]:
+			var opt: OptionButton = pair[0]
+			for i in range(opt.item_count):
+				if String(opt.get_item_metadata(i)) == String(pair[1]):
+					opt.select(i)
+		ui._controls_changed()
+		ui.auto_generate = true
+		ui.regenerate()
+		ui.auto_generate = false
+		if ui.specs.is_empty():
+			printerr("Studio vernacular village failed: %s" % ui.info_label.text)
+			return
+		for i in range(30):
+			await process_frame
+		root.get_texture().get_image().save_png(shot["file"])
+		print("wrote ", shot["file"])

@@ -398,6 +398,37 @@ func to_dict() -> Dictionary:
 	return {"blend": blend, "groups": g, "coherence": coherence}
 
 
+## The blend in words: "Provence", "Norse 50% + Japanese 50%",
+## "Cyclades; roofs: Japanese", "...; coherence 1.0". The Studio, the walk
+## rig and its pin records all say it this way.
+func label() -> String:
+	var parts := PackedStringArray()
+	# the larger share first, then by id
+	var order := _sorted_keys(blend)
+	order.sort_custom(func(a, b) -> bool:
+		if absf(float(blend[a]) - float(blend[b])) > 1e-9:
+			return float(blend[a]) > float(blend[b])
+		return String(a) < String(b))
+	for id in order:
+		var name := _short_label(id)
+		parts.append(name if blend.size() == 1 else "%s %d%%" % [name, roundi(float(blend[id]) * 100.0)])
+	var out := " + ".join(parts)
+	for g in GROUPS:
+		var w: Dictionary = groups.get(g, blend)
+		if w != blend:
+			var names := PackedStringArray()
+			for id in _sorted_keys(w):
+				names.append(_short_label(id))
+			out += "; %s: %s" % [String(g), ", ".join(names)]
+	if coherence > 0.0:
+		out += "; coherence %.1f" % coherence
+	return out
+
+
+static func _short_label(id: StringName) -> String:
+	return String(region(id).get("label", String(id))).get_slice(" (", 0)
+
+
 ## The region with the most weight in `group`; ties go to the first id.
 func dominant(group: StringName = &"houses") -> StringName:
 	var w: Dictionary = groups.get(group, blend)

@@ -29,6 +29,7 @@ func _init() -> void:
 	var selected: BuildingRequest = ui._request(42)
 	if selected.decoration_level != 0.9 or selected.upkeep != 0.2: failures.append("Appearance controls lost in request")
 	if not ui.info_label.text.contains("Grow village"): failures.append("Slider does not defer generation")
+	_check_vernacular(ui, descriptor)
 	if ui.seed_input.text.is_empty(): failures.append("Seed input missing")
 	var request := BrickWild.default_request(&"village", 42)
 	request.length = 0
@@ -44,6 +45,46 @@ func _init() -> void:
 	ui.bp_view.setup_village(plan)
 	if ui.bp_view.village != plan or ui.bp_view.spec != null: failures.append("Blueprint did not retain the village plan")
 	for fail in failures: print("FAIL " + fail)
-	print("studio_village: descriptor controls, seed, water/edge roundtrip and blueprint binding; %d failures" % failures.size())
+	print("studio_village: descriptor controls, seed, water/edge roundtrip, regional controls and blueprint binding; %d failures" % failures.size())
 	ui.queue_free()
 	quit(0 if failures.is_empty() else 1)
+
+
+## VILLAGE-VERNACULAR: the region pickers are the descriptor's, nothing is
+## asked for until a region is chosen, and every combination the controls can
+## make is a request the library takes and JSON keeps.
+func _check_vernacular(ui, descriptor: Dictionary) -> void:
+	var regions: Array = descriptor["vernacular"]["regions"]
+	for opt in [ui.region_opt, ui.blend_opt, ui.roofs_opt, ui.paint_opt]:
+		if opt.item_count != regions.size() + 1 or opt.get_item_metadata(0) != &"":
+			failures.append("Region options drift from the descriptor")
+		for i in range(regions.size()):
+			if opt.get_item_metadata(i + 1) != StringName(regions[i]["id"]):
+				failures.append("Region option identity drift")
+	if not ui.region_opt.visible: failures.append("Region control hidden for a village")
+	if ui.blend_opt.visible or ui.share_slider.visible: failures.append("Blend controls shown with no region")
+	if not ui.vernacular().is_empty() or not ui._request(42).vernacular.is_empty():
+		failures.append("A region was asked for before one was chosen")
+	var pick := func(opt: OptionButton, id: String) -> void:
+		for i in range(opt.item_count):
+			if String(opt.get_item_metadata(i)) == id:
+				opt.select(i)
+		ui._controls_changed()
+	pick.call(ui.region_opt, "cyclades")
+	if ui.vernacular() != {"cyclades": 1.0}: failures.append("One region is not a plain blend: %s" % ui.vernacular())
+	if not ui.blend_opt.visible or ui.share_slider.visible: failures.append("Blend picker wrong with one region")
+	pick.call(ui.blend_opt, "norse")
+	ui.share_slider.value = 0.3
+	ui.coherence_slider.value = 0.5
+	pick.call(ui.roofs_opt, "japanese")
+	var v: Dictionary = ui.vernacular()
+	var blend: Dictionary = v.get("blend", {})
+	if not is_equal_approx(float(blend.get("cyclades", 0)), 0.7) or not is_equal_approx(float(blend.get("norse", 0)), 0.3) \
+			or not is_equal_approx(float(v.get("coherence", 0)), 0.5) or v.get("groups", {}).get("roofs", {}) != {"japanese": 1.0}:
+		failures.append("Blend, coherence or roofs lost: %s" % v)
+	if not ui.share_slider.visible or not ui.coherence_slider.visible: failures.append("Share and coherence hidden in a blend")
+	var req: BuildingRequest = ui._request(42)
+	if not BuildingLibrary.validate(req).is_empty(): failures.append("Studio's blend refused: %s" % BuildingLibrary.validate(req))
+	if BuildingRequest.from_json(req.to_json()).to_dict() != req.to_dict(): failures.append("Blend lost in request JSON")
+	pick.call(ui.region_opt, "")
+	if not ui.vernacular().is_empty() or ui.blend_opt.visible: failures.append("None did not clear the region")

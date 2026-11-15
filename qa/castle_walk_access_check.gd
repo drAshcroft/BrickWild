@@ -131,7 +131,7 @@ static func hall_fire_failures(rows: Dictionary) -> Array[String]:
 static func tower_exit_failures(rows: Array, spec: CastleSpec = null) -> Array[String]:
 	var out: Array[String] = []
 	# a battered foot buries a ground door: only the raised one is cut there
-	if spec != null and spec.batter > preload("res://src/castle/castle_mural_plan.gd").FOOT_DOOR_BATTER_MAX:
+	if spec != null and spec.batter > CastleWalkSources.MuralPlan.FOOT_DOOR_BATTER_MAX:
 		return out
 	for row in rows:
 		# a gate tower is entered through its own gate passage

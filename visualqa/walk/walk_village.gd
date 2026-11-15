@@ -123,23 +123,10 @@ static func meta_of(stop: Dictionary, v_seed: int, planned: Dictionary) -> Dicti
 	return meta
 
 
-## "Provence", "Norse 50% + Japanese 50%", "Cyclades; roofs: Japanese".
+## "Provence", "Norse 50% + Japanese 50%", "Cyclades; roofs: Japanese"
+## (VillageVernacular.label, which the Studio uses too).
 static func vernacular_label(fs: VillageVernacular) -> String:
-	var parts := PackedStringArray()
-	for id in fs.blend:
-		var label := String(VillageVernacular.region(id).get("label", String(id))).get_slice(" (", 0)
-		parts.append(label if fs.blend.size() == 1 else "%s %d%%" % [label, roundi(float(fs.blend[id]) * 100.0)])
-	var out := " + ".join(parts)
-	for g in fs.groups:
-		var w: Dictionary = fs.groups[g]
-		if w != fs.blend:
-			var names := PackedStringArray()
-			for id in w:
-				names.append(String(VillageVernacular.region(id).get("label", String(id))).get_slice(" (", 0))
-			out += "; %s: %s" % [g, ", ".join(names)]
-	if fs.coherence > 0.0:
-		out += "; coherence %.1f" % fs.coherence
-	return out
+	return fs.label()
 
 
 ## VillageVernacularCheck on the planned village, small enough for the
