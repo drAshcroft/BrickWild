@@ -2,6 +2,10 @@
 
 Generated villages measured against the real world set, stratum by stratum.
 Suite `vrealism` (`tests/suites/village_realism_suite.gd`), in `lane:scheduled`.
+What a person WALKING a village sees -- house sizes as a distribution, house
+types, gaps, touching neighbours, the wall's distance -- and how the real
+numbers feed the generator: docs/VILLAGE_REAL_LAYOUT.md (VREAL). The VREAL
+change of 13 Nov moves every plan, so this gate's baseline needs a re-judge.
 
 ```
 godot --headless --path . --script res://tests/run_all.gd -- vrealism > artifacts/vter_realism/gate.log 2>&1

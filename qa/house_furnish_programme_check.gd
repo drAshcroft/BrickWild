@@ -42,7 +42,7 @@ func check_program(plan: HousePlan) -> void:
 				dining = plan.rooms_of(&"parlour")[0]
 			if _room_has(plan, dining, "table"):
 				cats = cats.filter(func(c: String) -> bool: return c != "table")
-				if _room_has(plan, i, "table"):
+				if _room_has_dining_table(plan, i):
 					failures.append("programme: room %d (parlour) has a second dining table; the household eats in room %d"
 						% [i, dining])
 		for cat in cats:
@@ -93,6 +93,19 @@ static func _purpose(spec: HouseSpec) -> String:
 ## reporting that as a defect would be reporting the size of the house.
 static func could_hold(plan: HousePlan, room: int, cat: String) -> bool:
 	return HouseFurnishPlacement.could_place(plan, room, cat)
+
+
+## A table in this room that is a place to dine. The sitting parlour's side
+## table (period_seating = with_table; HouseFurnishingRecipes.SIDE_TABLE) is
+## set against a wall in the `sitting` group: the seats in the room are sat at
+## it, and it is not the second dining table the walk QA tripped over.
+static func _room_has_dining_table(plan: HousePlan, room: int) -> bool:
+	for f in plan.furniture_of(room):
+		var piece: Dictionary = plan.furniture[f]
+		if PropCatalog.category(piece["key"]) == "table" \
+				and String(piece.get("activity_group", "")) != "sitting":
+			return true
+	return false
 
 
 static func _room_has(plan: HousePlan, room: int, cat: String) -> bool:

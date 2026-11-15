@@ -610,6 +610,8 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 			if category == "barrel":
 				step["zone_depth_override"] = 0.6
 		tagged.append(step)
+	if kind == &"bedroom":
+		_add_household_beds(plan, room, tagged)
 	if kind == &"kitchen":
 		var prep_pair: Array = [
 			{"cat": "workbench", "rule": &"beside", "near_cat": "storage", "align_back": true, "n": [1, 1], "opt": 1.0, "group": "cooking"},
@@ -741,7 +743,62 @@ static func recipe_for_room(plan: HousePlan, room: int, sitting_if_available := 
 	return tagged
 
 
+## HOME-BRIEF: the household's further beds in this room, right after its
+## first. The first bed stays the room's defining piece; the others are always
+## attempted but not required (min_n 0, repair_optional), so a room that cannot
+## take one gives it up and the brief's shortfall shows it, rather than the
+## walk being blocked or the activity audit failing a valid bedroom.
+static func _add_household_beds(plan: HousePlan, room: int, tagged: Array) -> void:
+	var extra: int = HouseHousehold.beds_for(plan, room) - 1
+	if extra <= 0:
+		return
+	for index in range(tagged.size()):
+		var step: Dictionary = tagged[index]
+		if String(step.get("cat", "")) != "bed":
+			continue
+		var more: Dictionary = step.duplicate(true)
+		more["n"] = [extra, extra]
+		more["min_n"] = 0
+		more["repair_optional"] = true
+		more["always_attempt"] = true
+		more["household_bed"] = true
+		tagged.insert(index + 1, more)
+		return
+
+
+## The parlour's side table under `period_seating = with_table`: the catalogue
+## trestle at its smallest plan scale (1.77 x 0.68 m) and full height, set
+## against a wall, with its seats drawn up to the open side. It is where the
+## seats in the room are sat at -- a card or work table, not a second place to
+## dine; HouseFurnishProgrammeCheck tells it from a dining table by its
+## `sitting` group.
+const SIDE_TABLE := [
+	{"cat": "table", "rule": &"wall", "n": [1, 1], "opt": 1.0, "group": "sitting",
+		"scales": [0.62], "height_scale": 1.0, "wall_only": true},
+	{"cat": "seat", "rule": &"around", "n": [2, 2], "min_n": 1, "opt": 1.0, "group": "sitting"},
+]
+
+
+## Does this house keep a table in every room of seats (period_seating)?
+static func seats_need_a_table(plan: HousePlan) -> bool:
+	return plan == null or plan.spec == null or not "period_seating" in plan.spec \
+		or StringName(plan.spec.get("period_seating")) != HouseSpec.SEATING_WITHOUT_TABLE
+
+
 static func _sitting_parlour_recipe(plan: HousePlan = null) -> Array:
+	if plan != null and seats_need_a_table(plan):
+		# with_table: the side table and its chairs take the settle's place;
+		# the books, the chest and the lamps stay.
+		var rest: Array = []
+		for step in SITTING_PARLOUR.duplicate(true):
+			var category: String = String(step.get("cat", ""))
+			if category == "bench":
+				continue
+			if category == "sconce":
+				step["group"] = "sitting"
+				step["opt"] = 1.0
+			rest.append(step)
+		return SIDE_TABLE.duplicate(true) + rest
 	var out: Array = SITTING_PARLOUR.duplicate(true)
 	for step in out:
 		var category: String = String(step.get("cat", ""))

@@ -94,6 +94,64 @@ static func gates(plan: VillagePlan) -> Array[Vector2]:
 	return out
 
 
+## Where a traveller ARRIVES (VREAL-BODY, docs/VILLAGE_REAL_LAYOUT.md): the
+## gates of an enclosed village; for an open one, where the through road
+## enters the built body -- on each side of the common, the farthest point
+## along the through road that a building stands within ENTRANCE_FRONT_M of,
+## ENTRANCE_BEYOND_M further on. `gates()` is the site's edge for an open
+## village, and "by the gate" read from it stood a tavern 134 m from any
+## house on a stretched site. The tavern rule reads this.
+const ENTRANCE_FRONT_M := 20.0
+const ENTRANCE_BEYOND_M := 8.0
+const ENTRANCE_STEP_M := 2.0
+
+static func entrances(plan: VillagePlan) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	for g in plan.gate_crossings:
+		out.append(g["pos"])
+	if not out.is_empty() or plan.spec.enclosure != &"none":
+		return out
+	var polys: Array[PackedVector2Array] = []
+	for b in plan.buildings:
+		polys.append(bounds_poly(b))
+	var cc: Vector2 = common_centre(plan)
+	for r in plan.roads_of_class(&"through"):
+		out.append_array(road_entrances(plan.roads[r]["points"], cc, func(p: Vector2) -> bool:
+			for poly in polys:
+				if point_to_poly(p, poly) <= ENTRANCE_FRONT_M:
+					return true
+			return false))
+	return out
+
+
+## The two points where `line` leaves the stretch `occupied` says is built,
+## either side of the point nearest `cc`, ENTRANCE_BEYOND_M beyond it; a side
+## with nothing built gives its end of the line.
+static func road_entrances(line: PackedVector2Array, cc: Vector2, occupied: Callable) -> Array[Vector2]:
+	var samples: Array[Vector2] = []
+	for i in range(line.size() - 1):
+		var n: int = maxi(1, int(ceil(line[i].distance_to(line[i + 1]) / ENTRANCE_STEP_M)))
+		for k in range(n):
+			samples.append(line[i].lerp(line[i + 1], float(k) / float(n)))
+	samples.append(line[line.size() - 1])
+	if samples.size() < 2:
+		return []
+	var mid := 0
+	for i in samples.size():
+		if samples[i].distance_to(cc) < samples[mid].distance_to(cc):
+			mid = i
+	var beyond: int = int(ceil(ENTRANCE_BEYOND_M / ENTRANCE_STEP_M))
+	var low := 0
+	for i in range(mid, -1, -1):
+		if occupied.call(samples[i]):
+			low = maxi(0, i - beyond)
+	var high := samples.size() - 1
+	for i in range(mid, samples.size()):
+		if occupied.call(samples[i]):
+			high = mini(samples.size() - 1, i + beyond)
+	return [samples[low], samples[high]]
+
+
 ## The shop business of a building, or &"" for anything that is not a shop.
 static func business(b: Dictionary) -> StringName:
 	var req: BuildingRequest = b["request"]

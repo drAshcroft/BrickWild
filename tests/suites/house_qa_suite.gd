@@ -292,6 +292,7 @@ static func _poles_sweep(res: SuiteResult, count: int) -> void:
 	var styles: Array = HouseSweep.styles()
 	var trades: Array = HouseSweep.trades()
 	var houses := 0
+	var houses_with_kitchen := 0
 	var on_kitchen := 0
 	var on_store := 0
 	var on_other := 0
@@ -313,6 +314,8 @@ static func _poles_sweep(res: SuiteResult, count: int) -> void:
 		var plan: HousePlan = HousePlanner.plan(spec)
 		res.checked += 1
 		houses += 1
+		if plan.has_kind(&"kitchen"):
+			houses_with_kitchen += 1
 		var back := -1
 		for d in range(plan.doors.size()):
 			# a sliding screen door onto an engawa (HS-MINKA) is not the back door
@@ -337,10 +340,14 @@ static func _poles_sweep(res: SuiteResult, count: int) -> void:
 			if String(m).begins_with("doors_in_line:"):
 				in_line += 1
 				res.fail("poles sweep: seed=%d %s" % [spec.seed, String(m)])
-	res.note("poles       %d houses: back door on kitchen %d, store %d, other %d; kitchen on back wall %d/%d"
-		% [houses, on_kitchen, on_store, on_other, kitchens_back, kitchens])
-	if houses > 0 and float(on_kitchen) / float(houses) < 0.8:
-		res.fail("poles sweep: the back door is on the kitchen in only %d of %d houses" % [on_kitchen, houses])
+	res.note("poles       %d houses (%d with a kitchen): back door on kitchen %d, store %d, other %d; kitchen on back wall %d/%d"
+		% [houses, houses_with_kitchen, on_kitchen, on_store, on_other, kitchens_back, kitchens])
+	# A living-hall house (HOME-HEARTH) has no kitchen to put a back door on:
+	# its service end is the store, and a back door from anywhere but a service
+	# room still fails above. The kitchen share is over the houses that have one.
+	if houses_with_kitchen > 0 and float(on_kitchen) / float(houses_with_kitchen) < 0.8:
+		res.fail("poles sweep: the back door is on the kitchen in only %d of %d houses with a kitchen"
+			% [on_kitchen, houses_with_kitchen])
 	if kitchens > 0 and float(kitchens_back) / float(kitchens) < 0.8:
 		res.fail("poles sweep: the kitchen touches the back wall in only %d of %d houses" % [kitchens_back, kitchens])
 

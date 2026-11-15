@@ -117,10 +117,30 @@ static func open_up_privacy(p: HousePlan) -> void:
 			if p.kind_of(i) != &"bedroom" and not polite.has(i):
 				stranded = i
 				break
+		var bedroom_case := false
+		if stranded < 0:
+			# A bedroom whose only way in is through another bedroom is stranded
+			# too (intimacy gradient; design audit R-17). Two chambers in a
+			# living-hall cottage (HOME-HEARTH) made it common.
+			for i in range(p.rooms.size()):
+				if p.kind_of(i) == &"bedroom" and not polite.has(i):
+					stranded = i
+					bedroom_case = true
+					break
 		if stranded < 0:
 			return
 		var added := false
+		var order: Array[int] = []
 		for j in range(p.rooms.size()):
+			if not bedroom_case or p.kind_of(j) != &"store":
+				order.append(j)
+		if bedroom_case:
+			# a hall, parlour or landing before a store: a chamber entered
+			# through the buttery is only a little better than through a bed
+			for j in range(p.rooms.size()):
+				if p.kind_of(j) == &"store":
+					order.append(j)
+		for j in order:
 			if j == stranded or p.kind_of(j) in HouseGeometry.SLEEPING or not polite.has(j):
 				continue
 			var edge: Array = shared_edge(p, j, stranded)

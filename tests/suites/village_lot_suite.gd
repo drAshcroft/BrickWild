@@ -135,7 +135,7 @@ static func judge(plan: VillagePlan) -> Array[String]:
 		var bounds: AABB = pl["bounds"]
 		var measured_w: float = maxf(fp.size.x, bounds.size.x)
 		var front_len: float = front[0].distance_to(front[1])
-		var frontage_slack: float = VillageLotPlanner.frontage_slack(plan.spec)
+		var frontage_slack: float = VillageLotPlanner.frontage_need(plan.spec, lot)
 		if front_len < measured_w + frontage_slack - 1e-3:
 			out.append("lot %d frontage %.2f < measured width %.2f + %.2f" % [
 				int(b["lot"]), front_len, measured_w, frontage_slack])
@@ -221,6 +221,11 @@ static func judge(plan: VillagePlan) -> Array[String]:
 			var bj: Dictionary = plan.buildings[j]
 			var rj: PackedVector2Array = Placement.world_rect(bj["placement"], bj["transform"], false)
 			var d: float = _poly_distance(ri, rj)
+			if VillageLotPlanner.party_pair(plan, i, j):
+				# a party side (VREAL-PACK): eaves near, never over each other
+				if d < VillageLotPlanner.JOIN_GAP * 0.5 - 1e-3:
+					out.append("%s and %s share a party side but their eaves meet" % [bi["class"], bj["class"]])
+				continue
 			var want_gap: float = maxf(
 				VillageLotPlanner.fire_gap(bi["class"], plan.spec),
 				VillageLotPlanner.fire_gap(bj["class"], plan.spec))
@@ -238,7 +243,10 @@ static func judge(plan: VillagePlan) -> Array[String]:
 static func _check_lot_classes(res: SuiteResult) -> void:
 	var cases := [
 		[BuildingRequest.house(1, &"cottage", &"none"), &"cottage"],
-		[BuildingRequest.house(1, &"cottage", &"farmer"), &"farm"],
+		[BuildingRequest.house(1, &"farmhouse", &"farmer"), &"farm"],
+		# a smallholder: farmer by trade, cottage by house (VREAL-TYPES)
+		[BuildingRequest.house(1, &"cottage", &"farmer"), &"cottage"],
+		[BuildingRequest.house(1, &"longhall", &"farmer"), &"farm"],
 		[BuildingRequest.house(1, &"townhouse", &"none"), &"townhouse"],
 		[BuildingRequest.shop(1, &"tavern"), &"shop"],
 		[BuildingRequest.church(1), &"church"],

@@ -424,6 +424,12 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 		if request.upkeep != 1.0:
 			out.append(_error(&"unsupported_option", &"upkeep",
 				"upkeep is only available for villages."))
+	if not HouseSpec.SEATING_OPTIONS.has(request.period_seating):
+		out.append(_error(&"unknown_option", &"period_seating",
+			"period_seating must be with_table or without_table."))
+	elif request.period_seating != HouseSpec.SEATING_WITH_TABLE and request.kind != &"house":
+		out.append(_error(&"unsupported_option", &"period_seating",
+			"period_seating is only available for houses."))
 	if request.kind == &"world" and out.is_empty():
 		# a world family narrows the kind's envelope with its own, and owns
 		# which sub-kinds it comes in

@@ -1,0 +1,343 @@
+Interior dataset statistics -- generated 2026-11-14 by scripts/stats_*.py (python -I). n = sample size on every line.
+Conventions: 'at wall' = within 0.15 m of the room polygon boundary; HSSD room polygons include open-plan region splits that are not walls; SUN RGB-D layouts are the visible part of a room only.
+
+================ 1. HSSD-hab (168 human-authored houses) ================
+# HSSD-hab: 168 scenes (houses), 2332 labelled regions; furniture not inside any region: 612
+
+## Rooms per type: n, median area m2 [p25-p75], furniture/m2 median, windows median, door degree median
+bedroom                          n= 382 area=16.27 [12.515-22.24] furn/m2=0.332 windows=0.0 doors=0.0
+bathroom                         n= 332 area=6.624 [5.021-9.57] furn/m2=0.307 windows=0.0 doors=0.0
+closet                           n= 232 area=2.657 [1.297-5.171] furn/m2=0.236 windows=0.0 doors=0.0
+kitchen                          n= 172 area=17.449 [12.467-25.196] furn/m2=0.521 windows=0.0 doors=0.0
+hallway                          n= 162 area=9.349 [4.681-15.901] furn/m2=0.0 windows=0.0 doors=0.0
+toilet                           n= 151 area=2.07 [1.344-3.739] furn/m2=0.4 windows=0 doors=0
+living room                      n= 133 area=32.409 [23.91-48.472] furn/m2=0.216 windows=0 doors=1
+outdoor                          n= 110 area=120.812 [30.128-246.392] furn/m2=0.008 windows=0.0 doors=1.0
+dining room                      n=  86 area=16.427 [12.143-24.258] furn/m2=0.243 windows=0.0 doors=0.0
+laundryroom/mudroom              n=  84 area=5.092 [3.258-6.963] furn/m2=0.781 windows=0.0 doors=0.0
+other room                       n=  80 area=8.611 [4.924-24.072] furn/m2=0.062 windows=0.0 doors=0.0
+office                           n=  71 area=11.704 [8.306-15.445] furn/m2=0.384 windows=0 doors=0
+porch/terrace/deck/driveway      n=  71 area=19.181 [7.655-48.056] furn/m2=0.093 windows=0 doors=1
+entryway/foyer/lobby             n=  58 area=7.932 [4.944-12.034] furn/m2=0.091 windows=0.0 doors=1.0
+tv                               n=  42 area=23.7 [16.435-30.503] furn/m2=0.242 windows=0.0 doors=0.0
+garage                           n=  41 area=48.184 [36.628-56.361] furn/m2=0.03 windows=0 doors=1
+lounge                           n=  24 area=14.018 [9.254-21.084] furn/m2=0.272 windows=0.0 doors=1.0
+rec/game                         n=  23 area=20.763 [16.428-34.971] furn/m2=0.161 windows=0 doors=0
+balcony                          n=  16 area=4.835 [4.39-20.934] furn/m2=0.083 windows=0.0 doors=1.0
+utilityroom/toolroom             n=  15 area=3.504 [1.233-6.266] furn/m2=0.0 windows=0 doors=0
+familyroom                       n=  14 area=27.764 [15.675-32.632] furn/m2=0.287 windows=0.0 doors=0.0
+workout/gym/exercise             n=  11 area=22.293 [14.305-30.475] furn/m2=0.067 windows=0 doors=0
+classroom                        n=   7 area=16.953 [16.171-36.382] furn/m2=0.247 windows=0 doors=0
+dining booth                     n=   5 area=11.051 [10.391-11.235] furn/m2=0.096 windows=0 doors=0
+spa/sauna                        n=   3 area=15.934 [9.773-88.965] furn/m2=0.09 windows=0 doors=0
+meetingroom/conferenceroom       n=   3 area=22.579 [12.811-26.491] furn/m2=0.075 windows=0 doors=0
+bar                              n=   2 area=26.583 [10.171-42.996] furn/m2=0.596 windows=0.0 doors=0.0
+library                          n=   2 area=14.005 [10.429-17.58] furn/m2=0.124 windows=0.0 doors=0.5
+
+## Fraction of rooms of each type containing a category (top 12; n = rooms of that type)
+bedroom (n=382): bed:0.96, nightstand:0.57, chair:0.52, chest_of_drawers:0.51, table_lamp:0.50, wardrobe:0.32, mirror:0.31, desk:0.29, table:0.28, tv:0.26, book:0.21, floor_lamp:0.20, stool:0.17, shelves:0.13, armchair:0.12, bench:0.11, couch:0.11, candle:0.11, picture_frame:0.08, wall_clock:0.08, trashcan:0.08, mantel_clock:0.08
+bathroom (n=332): shower:0.53, bathtub:0.47, toilet:0.46, cabinet:0.35, trashcan:0.25, mirror:0.23, wall_lamp:0.09, shelves:0.07, toiletry:0.06, clothing:0.06, soap_dispenser:0.05, sink:0.05, bench:0.04, table:0.03, stool:0.03, washer_dryer:0.03, drinkware:0.02, chest_of_drawers:0.02, stand:0.02, candle:0.02, counter:0.01, wall_clock:0.01
+closet (n=232): shelves:0.29, wardrobe:0.19, mirror:0.09, chest_of_drawers:0.09, cabinet:0.06, stool:0.05, shoes:0.04, table:0.03, counter:0.03, fridge:0.02, floor_lamp:0.02, bench:0.02, washer_dryer:0.01, desk:0.01, chair:0.01, range_hood:0.00, pot:0.00, pan:0.00, toiletry:0.00, coffee_table:0.00, pathway_light:0.00, nightstand:0.00, wall_lamp:0.00, candle:0.00
+kitchen (n=172): cabinet:0.91, fridge:0.73, counter:0.60, chair:0.37, stool:0.31, coffee_maker:0.31, trashcan:0.23, range_hood:0.22, toaster:0.17, drinkware:0.16, bottle:0.16, dishwasher:0.15, table:0.15, tray:0.14, shelves:0.13, microwave:0.12, bowl:0.11, plate:0.11, dining_table:0.11, kettle:0.11, pot:0.09, blender:0.09, book:0.08, sink:0.08
+hallway (n=162): mirror:0.17, table:0.10, cabinet:0.08, chair:0.07, shelves:0.06, wall_lamp:0.05, wardrobe:0.04, table_lamp:0.04, book:0.04, chest_of_drawers:0.04, counter:0.04, bench:0.03, candle:0.02, stool:0.02, shoes:0.02, couch:0.02, armchair:0.02, stand:0.02, desk:0.01, floor_lamp:0.01, washer_dryer:0.01
+toilet (n=151): toilet:0.60, trashcan:0.26, cabinet:0.14, wall_lamp:0.14, mirror:0.10, sink:0.08, stand:0.03, toiletry:0.03, soap_dispenser:0.03, counter:0.02, shower:0.01, bowl:0.01, stool:0.01, drinkware:0.01, tray:0.01, shelves:0.01, bathtub:0.01
+living room (n=133): couch:0.95, coffee_table:0.74, table:0.64, chair:0.57, tv:0.44, fireplace:0.39, floor_lamp:0.36, book:0.29, table_lamp:0.29, stand:0.29, stool:0.28, armchair:0.23, mirror:0.20, counter:0.20, candle:0.20, shelves:0.17, dining_table:0.15, bench:0.14, cabinet:0.14, chest_of_drawers:0.11, wall_lamp:0.11, picture_frame:0.10
+outdoor (n=110): chair:0.30, armchair:0.24, table:0.23, couch:0.22, bench:0.16, car:0.16, flower:0.16, wall_lamp:0.14, coffee_table:0.10, stool:0.08, pathway_light:0.08, bed:0.07, trashcan:0.06, bicycle:0.05, cabinet:0.05, fireplace:0.05, bathtub:0.05, counter:0.04, dining_table:0.04, drinkware:0.03, camera:0.03, stand:0.02
+dining room (n=86): chair:0.53, dining_table:0.43, table:0.23, counter:0.20, cabinet:0.14, bench:0.10, mirror:0.09, floor_lamp:0.09, candle:0.09, bottle:0.07, fireplace:0.06, trashcan:0.06, stool:0.06, table_lamp:0.06, shelves:0.06, coffee_table:0.06, bowl:0.06, picture_frame:0.06, plate:0.05, wall_lamp:0.05, tv:0.03, couch:0.03
+laundryroom/mudroom (n=84): washer_dryer:1.00, cabinet:0.55, shelves:0.21, wardrobe:0.07, trashcan:0.06, counter:0.05, table:0.05, sink:0.05, stand:0.04, bench:0.02, chair:0.02, soap_dispenser:0.02, chest_of_drawers:0.02, dining_table:0.02, wall_lamp:0.02, mirror:0.02, shoes:0.01, stool:0.01, candle:0.01, book:0.01, wall_clock:0.01, dishwasher:0.01, bicycle:0.01
+other room (n=80): mirror:0.19, cabinet:0.17, couch:0.12, shelves:0.12, chair:0.11, wardrobe:0.11, table:0.10, bench:0.10, chest_of_drawers:0.10, stool:0.10, trashcan:0.09, tv:0.07, coffee_table:0.06, nightstand:0.06, counter:0.06, floor_lamp:0.06, desk:0.05, washer_dryer:0.05, fridge:0.05, candle:0.04, book:0.04, toilet:0.04, bed:0.04
+office (n=71): chair:0.80, desk:0.66, table:0.32, table_lamp:0.30, book:0.28, couch:0.24, cabinet:0.24, printer:0.24, shelves:0.21, laptop:0.20, trashcan:0.18, armchair:0.17, tv:0.14, stool:0.11, floor_lamp:0.11, wardrobe:0.10, phone:0.10, wall_lamp:0.10, stand:0.08, mirror:0.08, candle:0.06, bench:0.06, wall_clock:0.04
+porch/terrace/deck/driveway (n=71): chair:0.34, couch:0.31, table:0.24, armchair:0.20, coffee_table:0.17, bench:0.11, wall_lamp:0.11, stool:0.08, dining_table:0.06, car:0.06, cabinet:0.04, shoes:0.04, mirror:0.03, bowl:0.03, table_lamp:0.03, floor_lamp:0.03, fridge:0.03, counter:0.03, bathtub:0.03, pathway_light:0.01, sink:0.01
+entryway/foyer/lobby (n=58): table:0.22, mirror:0.21, bench:0.17, wall_lamp:0.12, chest_of_drawers:0.10, wardrobe:0.09, candle:0.07, shoes:0.07, picture_frame:0.07, table_lamp:0.05, chair:0.05, book:0.05, counter:0.05, cabinet:0.05, desk:0.05, stool:0.05, shelves:0.03, floor_lamp:0.03, stand:0.03, plate:0.02, couch:0.02
+
+## Distance of furniture footprint to its room boundary (m); '+z@wall' / '-z@wall' = that end's midpoint within 0.15 m
+cat                 n   median  p25   p75   frac<=0.10  +z@wall    -z@wall(back)
+cabinet            1674    0.0    0.0   0.0   0.92       0.27      0.88
+chair              1625  0.496  0.145 1.049   0.22       0.01      0.13
+table               735  0.118    0.0 0.788   0.48       0.08      0.33
+shelves             616    0.0    0.0   0.0   0.94       0.37      0.75
+stool               514  0.633  0.225 1.184   0.17       0.07      0.10
+couch               476  0.085    0.0 0.586   0.51       0.01      0.46
+bed                 435    0.0    0.0   0.0   0.94       0.02      0.90
+nightstand          390    0.0    0.0   0.0   0.93       0.04      0.91
+chest_of_drawers    381    0.0    0.0   0.0   0.93       0.02      0.91
+counter             331    0.0    0.0 0.768   0.64       0.05      0.52
+armchair            315  0.288  0.009 0.886   0.32       0.00      0.18
+wardrobe            306    0.0    0.0   0.0   0.99       0.03      0.97
+toilet              253    0.0    0.0 0.001   0.97       0.02      0.95
+tv                  235  0.001    0.0  0.08   0.77       0.66      0.80
+bench               233    0.0    0.0 0.569   0.59       0.09      0.40
+desk                228    0.0    0.0 0.019   0.83       0.13      0.69
+washer_dryer        187    0.0    0.0   0.0   0.98       0.03      0.97
+shower              183    0.0    0.0   0.0   0.99       0.12      0.90
+fridge              179    0.0    0.0   0.0   0.95       0.01      0.94
+bathtub             177    0.0    0.0   0.0   0.92       0.12      0.81
+stand               122    0.0    0.0 0.009   0.84       0.07      0.80
+fireplace            90    0.0    0.0 0.004   0.87       0.07      0.79
+sink                 64    0.0    0.0 0.077   0.78       0.03      0.78
+
+## Beds (n=435): +z end (foot) at wall 0.02, -z end (HEAD) at wall 0.90, a long side at wall 0.33, both long sides >0.45 m clear 0.60
+Bedside pieces per bed (n beds=435): [(2, 176), (0, 159), (1, 99), (3, 1)]
+Bedside piece lateral gap past bed side (n=454): median 0.3 [0.229-0.363] m; centre distance from head end: median 0.229 [0.21-0.251] m
+Bed-to-wardrobe gap in same room (n=132): median 1.138 [0.763-1.804] m
+
+## Chairs within 0.7 m of a table >=0.6 m high, by room type (distribution)
+living room                  tables= 106 median=0.0 dist=[(0, 68), (1, 5), (2, 11), (3, 3), (4, 6), (5, 2), (6, 8), (8, 1), (10, 2)]
+dining room                  tables=  93 median=4 dist=[(0, 24), (1, 1), (2, 9), (3, 5), (4, 28), (5, 2), (6, 15), (7, 1), (8, 4), (10, 3), (12, 1)]
+bedroom                      tables=  75 median=0 dist=[(0, 56), (1, 14), (2, 4), (4, 1)]
+kitchen                      tables=  46 median=2.0 dist=[(0, 21), (1, 1), (2, 7), (3, 4), (4, 8), (6, 4), (8, 1)]
+outdoor                      tables=  33 median=0 dist=[(0, 25), (1, 3), (2, 1), (5, 1), (6, 2), (8, 1)]
+office                       tables=  31 median=0 dist=[(0, 16), (1, 12), (2, 2), (3, 1)]
+tv                           tables=  26 median=0.0 dist=[(0, 24), (1, 2)]
+other room                   tables=  25 median=0 dist=[(0, 19), (1, 2), (3, 1), (4, 3)]
+porch/terrace/deck/driveway  tables=  19 median=0 dist=[(0, 10), (2, 3), (4, 3), (6, 3)]
+rec/game                     tables=  19 median=0 dist=[(0, 17), (4, 1), (7, 1)]
+hallway                      tables=  18 median=0.0 dist=[(0, 17), (1, 1)]
+lounge                       tables=  16 median=0.0 dist=[(0, 11), (1, 1), (2, 2), (4, 2)]
+entryway/foyer/lobby         tables=  15 median=0 dist=[(0, 14), (2, 1)]
+familyroom                   tables=  10 median=0.0 dist=[(0, 9), (4, 1)]
+bathroom                     tables=   9 median=0 dist=[(0, 9)]
+laundryroom/mudroom          tables=   9 median=0 dist=[(0, 8), (1, 1)]
+garage                       tables=   6 median=0.0 dist=[(0, 6)]
+closet                       tables=   6 median=0.0 dist=[(0, 6)]
+
+Sofa centre to nearest TV centre, same room (n=185): median 3.123 [2.462-3.949] m
+Sofa to nearest low table gap (n=340): median 0.321 [0.0-0.704] m
+Desk to nearest window in room (n=6): median 0.527 [0.037-2.345] m
+
+## Door jamb to nearest room-polygon vertex (m), by room type
+outdoor                          n= 192 median=1.809 p25=0.97 p75=3.098 frac<=0.3=0.08
+living room                      n=  93 median=1.165 p25=0.6 p75=1.791 frac<=0.3=0.09
+porch/terrace/deck/driveway      n=  76 median=1.287 p25=0.76 p75=2.505 frac<=0.3=0.08
+garage                           n=  66 median=1.758 p25=1.144 p75=2.392 frac<=0.3=0.08
+entryway/foyer/lobby             n=  57 median=0.685 p25=0.457 p75=0.947 frac<=0.3=0.11
+bedroom                          n=  55 median=1.395 p25=0.819 p75=1.644 frac<=0.3=0.04
+kitchen                          n=  51 median=0.8 p25=0.48 p75=1.363 frac<=0.3=0.14
+dining room                      n=  36 median=0.881 p25=0.456 p75=1.595 frac<=0.3=0.22
+hallway                          n=  34 median=0.79 p25=0.394 p75=1.665 frac<=0.3=0.24
+other room                       n=  28 median=1.516 p25=0.53 p75=3.86 frac<=0.3=0.18
+lounge                           n=  21 median=1.408 p25=0.96 p75=2.085 frac<=0.3=0.10
+balcony                          n=  16 median=1.044 p25=0.782 p75=1.561 frac<=0.3=0.12
+rec/game                         n=  11 median=1.545 p25=0.383 p75=2.703 frac<=0.3=0.18
+tv                               n=   7 median=1.118 p25=0.876 p75=2.037 frac<=0.3=0.14
+
+## Room-room connections through a door OBJECT (interior doorways are mostly stage geometry in HSSD, so this is exterior-biased) (n doors joining 2 regions = 277)
+  29  garage <-> outdoor
+  27  living room <-> outdoor
+  24  bedroom <-> outdoor
+  17  kitchen <-> outdoor
+  17  hallway <-> outdoor
+  17  dining room <-> outdoor
+  17  bedroom <-> porch/terrace/deck/driveway
+  15  entryway/foyer/lobby <-> outdoor
+  14  living room <-> porch/terrace/deck/driveway
+   9  lounge <-> outdoor
+   8  other room <-> outdoor
+   7  outdoor <-> rec/game
+   7  balcony <-> living room
+   6  kitchen <-> porch/terrace/deck/driveway
+   5  dining room <-> porch/terrace/deck/driveway
+   5  garage <-> porch/terrace/deck/driveway
+   4  outdoor <-> utilityroom/toolroom
+   4  outdoor <-> tv
+   4  lounge <-> porch/terrace/deck/driveway
+   3  hallway <-> porch/terrace/deck/driveway
+   3  balcony <-> bedroom
+   3  familyroom <-> porch/terrace/deck/driveway
+   2  laundryroom/mudroom <-> outdoor
+   2  entryway/foyer/lobby <-> porch/terrace/deck/driveway
+   2  porch/terrace/deck/driveway <-> porch/terrace/deck/driveway
+   2  closet <-> garage
+   2  balcony <-> office
+   1  dining room <-> living room
+   1  garage <-> laundryroom/mudroom
+   1  hallway <-> kitchen
+
+Doors touching only one region (exterior or open plan), by region: [('living room', 40), ('entryway/foyer/lobby', 36), ('garage', 28), ('kitchen', 22), ('other room', 20), ('bedroom', 10), ('hallway', 9), ('dining room', 9), ('lounge', 7), ('porch/terrace/deck/driveway', 4), ('bathroom', 3), ('laundryroom/mudroom', 2)]
+
+================ 2. SUN RGB-D (10,335 real RGB-D frames) ================
+# SUN RGB-D: 10335 frames, 8817 with a usable floor layout polygon
+Frames by scene type (with layout): bedroom:1084(1017), office:1046(923), classroom:1023(924), furniture_store:965(535), rest_space:924(772), bathroom:624(544), living_room:524(515), kitchen:498(445), dining_area:397(323), library:381(312), corridor:373(333), conference_room:290(280), idk:276(250), lab:258(215), discussion_area:201(178), dining_room:200(197), study_space:192(164), computer_room:179(151), lecture_theatre:176(117), home_office:169(167)
+
+## Most common annotated objects, residential scene types (box counts)
+bedroom (frames=1084): bed:724, pillow:698, chair:392, lamp:233, night_stand:232, box:206, desk:189, table:167, dresser:159, clothes:114, drawer:113, picture:99, shelf:97, curtain:93, sofa_chair:91, tv:87
+living_room (frames=524): chair:453, sofa:344, pillow:334, table:188, sofa_chair:138, coffee_table:113, endtable:104, tv:98, lamp:72, cabinet:61, picture:59, box:51, painting:48, door:44, shelf:44, ottoman:43
+dining_area (frames=397): chair:1754, table:553, stool:52, bench:47, dining_table:27, garbage_bin:22, stack_of_chairs:16, counter:15, box:12, sofa_chair:12, plastic_container:11, plate:10, food_tray:10, coffee_table:9, picture:8, sofa:7
+kitchen (frames=498): kitchen_counter:396, kitchen_cabinet:330, chair:240, sink:187, stove:133, fridge:125, microwave:114, garbage_bin:70, box:65, bowl:58, table:58, island:58, cabinet:57, tray:56, bottle:54, pot:48
+bathroom (frames=624): sink:392, toilet:326, towel:129, bathtub:124, mirror:87, urinal:83, garbage_bin:78, bathroomvanity:77, bathroom_vanity:54, toilet_paper:44, soap_dispenser:40, door:37, toilet_paper_dispenser:28, tissue:25, faucet:23, curtain:21
+home_office (frames=169): chair:156, desk:100, table:47, bookshelf:44, box:37, computer:36, cabinet:32, picture:29, pillow:28, speaker:27, book:25, laptop:24, monitor:22, sofa:21, drawer:20, shelf:19
+
+## Footprint distance to the visible-layout boundary (m); back = end opposite the annotated facing, within 0.15 m
+cat                 n    median  p25   p75   frac<=0.10  back@wall  front@wall
+bed                 1019    0.0    0.0 0.059   0.84        0.66       0.06
+night_stand          411  0.027    0.0 0.088   0.79        0.81       0.00
+dresser              322  0.012    0.0 0.091   0.77        0.69       0.02
+sofa                1028  0.104    0.0 0.564   0.49        0.40       0.01
+sofa_chair          1529  0.386  0.067 0.969   0.31        0.21       0.00
+chair              16455  0.752  0.309 1.283   0.14        0.10       0.01
+table               4272  0.379  0.033 0.881   0.35        0.23       0.01
+desk                2928  0.149    0.0 0.836   0.46        0.27       0.01
+bookshelf            440    0.0    0.0 0.025   0.88        0.72       0.07
+cabinet              711    0.0    0.0 0.048   0.86        0.75       0.08
+dresser_mirror        90  0.019    0.0 0.616   0.67        0.57       0.00
+toilet               288  0.028    0.0 0.072   0.86        0.87       0.04
+bathtub              111    0.0    0.0   0.0   0.97        0.80       0.12
+sink                 595  0.038    0.0 0.088   0.79        0.85       0.01
+tv                   286  0.089    0.0  0.24   0.54        0.44       0.10
+shelf                807    0.0    0.0 0.044   0.86        0.78       0.04
+fridge               246    0.0    0.0 0.056   0.83        0.59       0.04
+counter              200    0.0    0.0 0.049   0.83        0.68       0.02
+lamp                 635  0.077  0.026 0.198   0.58        0.59       0.04
+box                 1154  0.111  0.018 0.373   0.47        0.45       0.07
+pillow              1573  0.304  0.125 0.554   0.21        0.20       0.02
+garbage_bin          954  0.066    0.0 0.342   0.57        0.54       0.05
+
+Night stands within 0.5 m of a bed, per visible bed (n beds=1032): [(0, 651), (1, 328), (2, 53)]
+Chairs within 0.7 m of a table >=0.55 m high (home scene types only; partial views undercount):
+  bedroom        tables= 141 median=1 dist=[(0, 55), (1, 81), (2, 5)]
+  living_room    tables= 132 median=1.0 dist=[(0, 51), (1, 27), (2, 21), (3, 11), (4, 8), (5, 5), (6, 6), (7, 2), (8, 1)]
+  bathroom       tables=   4 median=0.0 dist=[(0, 3), (1, 1)]
+  furniture_store tables= 146 median=2.0 dist=[(0, 35), (1, 24), (2, 22), (3, 11), (4, 33), (5, 8), (6, 9), (7, 4)]
+  dining_room    tables= 171 median=4 dist=[(0, 11), (1, 18), (2, 23), (3, 28), (4, 21), (5, 19), (6, 17), (7, 14), (8, 10), (9, 6), (10, 3), (11, 1)]
+  home_office    tables=  43 median=1 dist=[(0, 12), (1, 23), (2, 6), (3, 1), (5, 1)]
+  dining_area    tables= 432 median=3.0 dist=[(0, 58), (1, 61), (2, 81), (3, 65), (4, 102), (5, 31), (6, 20), (7, 8), (8, 2), (9, 2), (10, 1), (11, 1)]
+  kitchen        tables=  46 median=2.0 dist=[(0, 12), (1, 5), (2, 7), (3, 6), (4, 7), (5, 4), (6, 5)]
+Sofa to nearest low table gap (n=204): median 0.26 [0.083-0.453] m
+
+================ 3. Swiss Dwellings v3 (45k real Swiss apartments) ================
+# Swiss Dwellings v3: 44894 residential apartments (areas); geometry sample 1/4: 11273 apartments, 92628 doors
+
+## Room areas (all residential apartments): type, n, median m2 [p10 p25 p75 p90]
+ROOM                   n= 82618 median=14.38 [10.49 12.02 16.39 19.69]
+BATHROOM               n= 68434 median=3.78 [1.77 2.87 4.56 5.56]
+CORRIDOR               n= 53392 median=7.53 [2.83 4.58 11.45 15.13]
+KITCHEN                n= 44085 median=8.04 [5.46 6.59 10.11 12.45]
+BALCONY                n= 43084 median=7.21 [2.89 4.67 10.76 15.97]
+LIVING_DINING          n= 24200 median=28.44 [19.28 23.29 33.43 39.25]
+BEDROOM                n= 22997 median=14.0 [10.58 11.88 15.51 17.08]
+STOREROOM              n= 14348 median=2.18 [0.81 1.43 3.22 4.91]
+LIVING_ROOM            n=  8459 median=20.63 [16.12 17.8 25.29 29.78]
+LOGGIA                 n=  4404 median=7.85 [3.28 5.39 10.2 14.29]
+DINING                 n=  1315 median=10.39 [6.16 8.13 13.76 18.83]
+TERRACE                n=   603 median=18.06 [5.84 11.22 37.41 74.2]
+WINTERGARTEN           n=   331 median=6.62 [0.77 4.37 10.72 15.11]
+GARDEN                 n=   186 median=12.78 [6.97 8.28 20.98 41.41]
+PATIO                  n=   178 median=10.56 [5.94 8.22 15.65 23.65]
+STAIRCASE              n=    58 median=3.9 [1.95 3.22 10.02 13.24]
+
+ROOM+BEDROOM count per apartment (n=44894): [(0, 1302), (1, 8507), (2, 15272), (3, 14346), (4, 4371), (5, 850), (6, 162), (7, 49), (8, 24), (9, 4)]
+
+## Doors per room (degree), windows per room, sample: type, n, median doors, dist, frac rooms with >=1 window, median windows
+ROOM                   n=20983 doors med=1 [(0, 148), (1, 14468), (2, 5079), (3, 994), (4, 217), (5, 49)] win>=1 0.92 win med=1
+BATHROOM               n=17185 doors med=1 [(0, 12), (1, 16297), (2, 815), (3, 40), (4, 9), (5, 5)] win>=1 0.25 win med=0
+CORRIDOR               n=13386 doors med=5.0 [(0, 97), (1, 593), (2, 1412), (3, 1927), (4, 2067), (5, 2071)] win>=1 0.07 win med=0.0
+KITCHEN                n=11037 doors med=1 [(0, 2583), (1, 5289), (2, 2773), (3, 371), (4, 16), (5, 3)] win>=1 0.68 win med=1
+BALCONY                n=10729 doors med=1 [(0, 10), (1, 7310), (2, 2560), (3, 534), (4, 193), (5, 53)] win>=1 0.71 win med=1
+LIVING_DINING          n= 6010 doors med=2.0 [(0, 160), (1, 1493), (2, 2234), (3, 1253), (4, 480), (5, 237)] win>=1 0.90 win med=2.0
+BEDROOM                n= 5700 doors med=1.0 [(0, 31), (1, 4417), (2, 1022), (3, 201), (4, 27), (5, 2)] win>=1 0.95 win med=1.0
+STOREROOM              n= 3554 doors med=1.0 [(0, 120), (1, 3216), (2, 180), (3, 28), (4, 9), (5, 1)] win>=1 0.07 win med=0.0
+LIVING_ROOM            n= 2140 doors med=2.0 [(0, 79), (1, 476), (2, 1061), (3, 343), (4, 114), (5, 45)] win>=1 0.88 win med=1.0
+LOGGIA                 n= 1131 doors med=1 [(0, 1), (1, 674), (2, 330), (3, 82), (4, 31), (5, 8)] win>=1 0.73 win med=1
+DINING                 n=  365 doors med=1 [(0, 143), (1, 92), (2, 81), (3, 29), (4, 11), (5, 1)] win>=1 0.81 win med=1
+TERRACE                n=  144 doors med=2.0 [(0, 4), (1, 59), (2, 49), (3, 15), (4, 8), (5, 4)] win>=1 0.65 win med=1.0
+WINTERGARTEN           n=   85 doors med=1 [(1, 45), (2, 19), (3, 8), (4, 12), (6, 1)] win>=1 0.82 win med=2
+PATIO                  n=   54 doors med=1.0 [(1, 36), (2, 7), (3, 7), (4, 3), (5, 1)] win>=1 0.74 win med=1.0
+GARDEN                 n=   54 doors med=1.0 [(0, 10), (1, 26), (2, 12), (3, 1), (4, 4), (5, 1)] win>=1 0.81 win med=1.0
+STAIRCASE              n=   14 doors med=1.0 [(0, 5), (1, 4), (2, 1), (3, 1), (4, 1), (5, 1)] win>=1 0.07 win med=0.0
+
+## Interior door connections, sample (n=76051 doors joining two areas)
+ 17421 0.229  CORRIDOR <-> ROOM
+ 14947 0.197  BATHROOM <-> CORRIDOR
+  5701 0.075  CORRIDOR <-> KITCHEN
+  5582 0.073  BALCONY <-> LIVING_DINING
+  4851 0.064  BEDROOM <-> CORRIDOR
+  4673 0.061  BALCONY <-> ROOM
+  2488 0.033  CORRIDOR <-> STOREROOM
+  2471 0.032  CORRIDOR <-> LIVING_DINING
+  2132 0.028  BALCONY <-> KITCHEN
+  1586 0.021  BALCONY <-> LIVING_ROOM
+  1424 0.019  CORRIDOR <-> LIVING_ROOM
+  1376 0.018  KITCHEN <-> LIVING_DINING
+  1255 0.017  LIVING_DINING <-> ROOM
+  1017 0.013  CORRIDOR <-> CORRIDOR
+   914 0.012  BALCONY <-> BEDROOM
+   738 0.010  BATHROOM <-> ROOM
+   738 0.010  LIVING_DINING <-> LOGGIA
+   634 0.008  ROOM <-> ROOM
+   569 0.007  KITCHEN <-> ROOM
+   554 0.007  BATHROOM <-> LIVING_DINING
+   439 0.006  LOGGIA <-> ROOM
+   362 0.005  BEDROOM <-> LIVING_DINING
+   305 0.004  KITCHEN <-> LIVING_ROOM
+   286 0.004  KITCHEN <-> LOGGIA
+   245 0.003  BEDROOM <-> LIVING_ROOM
+   214 0.003  LIVING_ROOM <-> ROOM
+   196 0.003  KITCHEN <-> STOREROOM
+   184 0.002  LIVING_DINING <-> STOREROOM
+
+Entrance door opens into: [('CORRIDOR', 10474), ('ROOM', 475), ('LIVING_DINING', 417), ('KITCHEN', 291), ('LIVING_ROOM', 150), ('BATHROOM', 51), ('BEDROOM', 38), ('STOREROOM', 29), ('LOGGIA', 16), ('DINING', 15)]
+
+## Door edge to nearest room-polygon vertex (m) -- how close doors sit to corners
+CORRIDOR               n= 64073 median=0.13 p25=0.06 p75=0.41 frac<=0.30=0.70
+ROOM                   n= 28907 median=0.12 p25=0.06 p75=0.58 frac<=0.30=0.65
+BATHROOM               n= 18157 median=0.09 p25=0.05 p75=0.18 frac<=0.30=0.83
+BALCONY                n= 15556 median=0.34 p25=0.06 p75=0.88 frac<=0.30=0.48
+LIVING_DINING          n= 13893 median=0.18 p25=0.06 p75=0.67 frac<=0.30=0.59
+KITCHEN                n= 12039 median=0.12 p25=0.05 p75=0.55 frac<=0.30=0.67
+BEDROOM                n=  7182 median=0.13 p25=0.07 p75=0.59 frac<=0.30=0.65
+LIVING_ROOM            n=  4448 median=0.19 p25=0.08 p75=0.75 frac<=0.30=0.57
+STOREROOM              n=  3701 median=0.09 p25=0.04 p75=0.19 frac<=0.30=0.83
+LOGGIA                 n=  1776 median=0.1 p25=0.02 p75=0.6 frac<=0.30=0.67
+
+## Fixed fittings: which room holds them; gap to that room's wall (m)
+KITCHEN            n= 17747 rooms: KITCHEN:1.00, ROOM:0.00 | wall gap median=0.0 frac<=0.05=0.98
+SINK               n= 16489 rooms: BATHROOM:0.99, KITCHEN:0.01, ROOM:0.00, CORRIDOR:0.00, BEDROOM:0.00 | wall gap median=0.0 frac<=0.05=0.89
+TOILET             n= 15483 rooms: BATHROOM:1.00 | wall gap median=0.0 frac<=0.05=0.82
+BATHTUB            n= 10314 rooms: BATHROOM:1.00 | wall gap median=0.0 frac<=0.05=0.99
+SHOWER             n=  2901 rooms: BATHROOM:1.00 | wall gap median=0.0 frac<=0.05=0.99
+STAIRS             n=  1842 rooms: CORRIDOR:0.76, LIVING_DINING:0.09, LIVING_ROOM:0.04, ROOM:0.04, BEDROOM:0.02 | wall gap median=0.0 frac<=0.05=0.79
+BUILT_IN_FURNITURE n=   778 rooms: CORRIDOR:0.75, BEDROOM:0.16, LIVING_DINING:0.04, LIVING_ROOM:0.02, KITCHEN:0.01 | wall gap median=0.0 frac<=0.05=0.99
+WASHING_MACHINE    n=   378 rooms: BATHROOM:0.51, STOREROOM:0.45, CORRIDOR:0.04, LIVING_DINING:0.00 | wall gap median=0.03 frac<=0.05=0.62
+ELEVATOR           n=     1 rooms: CORRIDOR:1.00 | wall gap median=0.03 frac<=0.05=1.00
+
+Kitchen fitting host room (open vs closed kitchen): [('KITCHEN', 17746), ('ROOM', 1)]
+
+================ 4. De Graeff probate inventory, Amsterdam 1709 ================
+# De Graeff inventory 1709: 1523 entries, 34 named rooms (in inventory order, i.e. the notary's walk)
+Entry categories: [('', 523), ('Textile', 232), ('Tableware', 179), ('Textile-bed', 64), ('Painting', 64), ('Object', 53), ('Jewelry', 53), ('Tool', 30), ('Furniture-table', 22), ('Furniture-chair', 22), ('Furniture-cupboard', 22), ('Carpet', 20), ('Lighting', 16), ('Mirror', 16), ('Clothing', 14), ('Suitcase', 13), ('Furniture-cabinet', 13), ('Furniture-chest', 11), ('Furniture-bed', 11), ('Sculpture', 11), ('Material', 10), ('Map', 9), ('Drawing', 9), ('Horse equipment', 6), ('Textile-curtain', 5)]
+
+room | entries | items | furniture entries by kind
+Solder                                   |  38 |  198 | {'chair': 6, 'table': 4, 'chest': 3, 'bed': 1, 'child_care': 1, 'Furniture/tool': 1}
+Solder_spijkerhokje                      |   6 |    9 | {'chair': 1}
+Solder_portal                            |   1 |    1 | {}
+Stairs_4-5                               |   4 |    5 | {'cupboard': 1}
+Landing 4th level                        |   5 |    5 | {}
+Verlakt_Camertje                         |   4 |    5 | {}
+Verlakt_Camertje_Poppenhuis              |   9 |   16 | {'Dollhouse': 2, 'poppenhuis': 1}
+Kamer_solder                             |  83 |  192 | {'chest': 10, 'cupboard': 3, 'couch': 1, 'bed': 1, 'chair': 1}
+Porcelijn_kamertje                       |  23 |   82 | {'cabinet': 4}
+Tweede_gedeelte_Camer_solder             |  88 |  359 | {'cupboard': 2, 'bed': 2, 'screen': 2, 'chair': 1, 'chest': 1}
+Groene_Kamer                             | 136 |  814 | {'chair': 8, 'cupboard': 2, 'chest': 1, 'cabinet': 1, 'table': 1, 'bed': 1}
+Boeken_Kamer                             |   3 |    4 | {'cupboard': 1}
+Groote_Kamer                             |  60 |   95 | {'chair': 17, 'table': 7, 'cabinet / curiosa': 5, 'cabinet': 4, 'bed': 1, 'cupboard': 1}
+Slaapkamer_Agneta                        |  37 |   72 | {'chair': 14, 'cupboard': 3, 'bed': 1}
+Slaapkamer_Son                           |  16 |   22 | {'bed': 2, 'chair': 2, 'cabinet': 1}
+Stairs_1-2                               |   3 |    5 | {}
+Voorhuis                                 |   8 |   10 | {'table': 2, 'bench': 1}
+Groote_Tapijtse_kamer                    |  14 |   31 | {'chair': 15, 'table': 4}
+Kleijne_zijdelkamer                      |  12 |   23 | {'chair': 12, 'table': 1}
+Slaapkamer_Pieter_de_Graeff              | 100 |  463 | {'chair': 7, 'cupboard': 3, 'table': 2, 'cabinet': 2, 'couch': 1}
+Secreet                                  |   1 |    1 | {'chest': 1}
+Provisie_Kamertje                        |  90 |  913 | {'cupboard': 2, 'cabinet': 2, 'table': 1, 'chest': 1}
+Keuken                                   |  20 |   89 | {}
+Portaal                                  |   5 |   18 | {'cupboard': 2}
+Kamertje_bij_portaal                     |   1 |    1 | {}
+Gang                                     |   4 |    7 | {'cupboard': 1}
+Bleekveld                                |   2 |    5 | {}
+Eetzaal                                  |  19 |   25 | {'chair': 6, 'table': 3, 'cabinet': 2, 'clock': 1, 'couch': 1, 'bed': 1}
+Kamertje_knegts                          |   8 |   18 | {'Furniture': 3, 'bed': 1}
+Pak_kelder                               |   2 |    2 | {'cupboard': 1, 'table': 1}
+?                                        | 527 |  527 | {}
+Stal                                     |   6 |   19 | {'chest': 1}
+No_location                              | 154 |  429 | {'table': 1}
+Comptoir                                 |  34 |  166 | {}

@@ -100,9 +100,10 @@ static func programme(spec: VillageSpec) -> Array[BuildingRequest]:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("programme|%d" % spec.seed)
 
-	var mix: Array[StringName] = _mixed_styles(spec, styles)
+	var areas: Array[float] = house_areas(spec)
+	var mix: Array[StringName] = _mixed_styles(spec, styles, areas)
 	for i in range(spec.households):
-		out.append(_make_house(spec, styles, rng, i, mix[i] if not mix.is_empty() else &""))
+		out.append(_make_house(spec, styles, rng, i, mix[i] if not mix.is_empty() else &"", areas[i]))
 
 	_append_landmark(out, spec, styles)
 	_append_shops(out, spec, styles)
@@ -366,23 +367,113 @@ static func _append_shops(out: Array[BuildingRequest], spec: VillageSpec, styles
 			earns = true
 		if not earns:
 			continue
+		var dims := shop_dims(spec, row["business"], _seed_for(spec, row["kind"]))
 		out.append(BuildingRequest.shop(
-			_seed_for(spec, row["kind"]), row["business"], styles["house"], 11.0, 14.0, 2.8, 1))
+			_seed_for(spec, row["kind"]), row["business"], styles["house"], dims.x, dims.y, 2.8, 1))
 
 	if spec.population >= BAKERY_MIN_POP:
+		var bakery := shop_dims(spec, &"bakery", _seed_for(spec, "bakery"))
 		out.append(BuildingRequest.shop(
-			_seed_for(spec, "bakery"), &"bakery", styles["house"], 11.0, 14.0, 2.8, 1))
+			_seed_for(spec, "bakery"), &"bakery", styles["house"], bakery.x, bakery.y, 2.8, 1))
 
 
-## Households come in sizes (VILLAGES 6, "hovels and big houses"): the
-## first households are the biggest and the last the one-room cottages, a
-## spread of HOUSE_SIZE_SPREAD either way about the wealth's own size. The
-## lot planner places them in this order, nearest the common first, which is
-## the wealth gradient the PlaceCheck measures.
-const HOUSE_SIZE_SPREAD := 0.22
+## A shop is the size of its trade (VREAL-SIZE), not one 11 x 14 m hall for a
+## smithy and a guildhall alike: a forge and a tailor's are cottages with a
+## workroom, an inn and a guildhall are the big houses of the place. Frontage
+## x depth at the historic pool's median house (VillageRealLayout.POOL), scaled
+## by the culture's own median, a seeded +-SHOP_JITTER, and never under the
+## library's shop envelope.
+const SHOP_SIZE := {
+	&"blacksmith": Vector2(7.5, 9.5), &"tavern": Vector2(9.0, 12.0),
+	&"general_store": Vector2(7.5, 10.0), &"inn": Vector2(11.0, 14.0),
+	&"stable": Vector2(8.0, 12.0), &"carpenter": Vector2(8.0, 11.0),
+	&"butcher": Vector2(7.5, 9.5), &"tailor": Vector2(7.5, 9.5),
+	&"town_hall": Vector2(10.0, 14.0), &"apothecary": Vector2(7.5, 9.5),
+	&"guildhall": Vector2(11.0, 15.0), &"bakery": Vector2(7.5, 10.0),
+}
+const SHOP_JITTER := 0.06
+
+static func shop_dims(spec: VillageSpec, business: StringName, shop_seed: int) -> Vector2:
+	if spec.compact_display:
+		return Vector2(11.0, 14.0)   # the compact grid's own measured size (see _make_house)
+	var base: Vector2 = SHOP_SIZE.get(business, Vector2(11.0, 14.0))
+	var scale: float = sqrt(float(VillageRealLayout.of(spec.effective_culture())["area_p50"])
+		/ float(VillageRealLayout.POOL["area_p50"]))
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("shop_size|%d" % shop_seed)
+	scale *= 1.0 + SHOP_JITTER * (2.0 * r.randf() - 1.0)
+	var envelope: Dictionary = BuildingLibrary.KIND_ROWS[&"shop"]
+	return Vector2(
+		snappedf(clampf(base.x * scale, float(envelope["width"]["min"]), float(envelope["width"]["max"])), 0.1),
+		snappedf(clampf(base.y * scale, float(envelope["length"]["min"]), float(envelope["length"]["max"])), 0.1))
+
+
+## Households come in sizes (VILLAGES 6, "hovels and big houses"), and the
+## sizes are what real old villages measure (VREAL-SIZE,
+## docs/VILLAGE_REAL_LAYOUT.md), not a ramp. Each household's footprint is
+## the culture's median main building (VillageRealLayout, from the survey's
+## cached OSM answers) times exp(sd * z): z a seeded normal draw, redrawn
+## beyond HOUSE_Z_MAX, and sd HOUSE_SD_SHARE of the real per-site log spread
+## (the rest of that spread is barns and sheds OSM maps as plain buildings,
+## which a village of homes does not draw). Wealth moves the median, never
+## the spread. How the areas are dealt to households is house_areas'.
+const HOUSE_SD_SHARE := 0.7
+const HOUSE_Z_MAX := 1.75
+const WEALTH_AREA_K := 0.3
+## A house's plan, long side over short side (its frontage is the short
+## side, as before): a longhall and a farmhouse with its byre are long, a
+## cottage nearly square. Drawn inside the range from the house's own seed.
+const STYLE_ASPECT := {
+	&"cottage": Vector2(1.2, 1.55), &"thatch_cottage": Vector2(1.25, 1.6),
+	&"farmhouse": Vector2(1.45, 2.1), &"longhall": Vector2(1.9, 2.6),
+	&"townhouse": Vector2(1.45, 1.9), &"witch_hut": Vector2(1.1, 1.35),
+}
+const ASPECT_DEFAULT := Vector2(1.2, 1.6)
+## A townhouse is narrow and tall (HS-TOWNHOUSE): its frontage is drawn in
+## this band, and its depth at most TOWNHOUSE_DEEP times its own aspect.
+const TOWNHOUSE_FRONT_MIN := 5.5
+const TOWNHOUSE_FRONT_MAX := 7.5
+const TOWNHOUSE_DEEP := 1.15
+
+
+## Every household's footprint, m2, by household index. The special trades
+## (smith, scholar, innkeeper, alchemist: the first households) take sizes
+## from the middle of the village, spread over its central half -- a smith
+## is not the richest man in the place -- and everyone else the rest,
+## biggest first. Pure in (spec.seed, culture, wealth, households, population).
+static func house_areas(spec: VillageSpec) -> Array[float]:
+	var real: Dictionary = VillageRealLayout.of(spec.effective_culture())
+	var median: float = float(real["area_p50"]) * exp(WEALTH_AREA_K * (clampf(spec.wealth, 0.0, 1.0) - 0.5))
+	var sd: float = float(real["log_sd"]) * HOUSE_SD_SHARE
+	var draw := RandomNumberGenerator.new()
+	draw.seed = hash("house_area|%d" % spec.seed)
+	var sorted: Array[float] = []
+	var n: int = spec.households
+	for i in range(n):
+		var z: float = draw.randfn(0.0, 1.0)
+		while absf(z) > HOUSE_Z_MAX:
+			z = draw.randfn(0.0, 1.0)
+		sorted.append(median * exp(sd * z))
+	sorted.sort()
+	sorted.reverse()
+	var specials: int = mini(_special_trades(spec).size(), n)
+	var middle: Array[int] = []
+	for k in range(specials):
+		var rank: int = clampi(int(floorf(float(n) * (0.25 + 0.5 * (float(k) + 0.5) / float(specials)))), 0, n - 1)
+		while middle.has(rank):
+			rank = (rank + 1) % n
+		middle.append(rank)
+	var out: Array[float] = []
+	for k in range(specials):
+		out.append(sorted[middle[k]])
+	for rank in range(n):
+		if not middle.has(rank):
+			out.append(sorted[rank])
+	return out
+
 
 static func _make_house(spec: VillageSpec, styles: Dictionary, rng: RandomNumberGenerator, i: int,
-		forced_style: StringName = &"") -> BuildingRequest:
+		forced_style: StringName = &"", area: float = 0.0) -> BuildingRequest:
 	var trade := _trade_for(spec, i)
 	# the draw is always taken, so a forced style leaves every later house and
 	# shop exactly where it was
@@ -390,53 +481,131 @@ static func _make_house(spec: VillageSpec, styles: Dictionary, rng: RandomNumber
 	if forced_style != &"":
 		style = forced_style
 	var storeys := _storeys_for(spec.wealth, rng)
+	if spec.compact_display:
+		# The compact display is a fixed grid other projects show many of; its
+		# lots, churchyard and common were measured on these sizes, so it keeps
+		# them (VREAL-SIZE; its own suite, vcompact, failed on the real draw).
+		var ramp := _ramp_dims(spec, i)
+		return BuildingRequest.house(_seed_for(spec, "house|%d" % i), style, trade,
+			ramp.x, ramp.y, 2.6, maxi(storeys, int(spec.ground_character().get("storeys_min", 0))))
+	var real: Dictionary = VillageRealLayout.of(spec.effective_culture())
+	if area <= 0.0:
+		area = float(real["area_p50"])
+	# in the middle of the wealth band a house bigger than the real p75 is the
+	# long low farmhouse: it spreads, it does not also climb (VREAL-SIZE)
+	if spec.wealth <= 0.6 and area > float(real["area_p75"]) and style != &"townhouse":
+		storeys = 1
+	# a house too small for a climbable flight is a cottage with a loft, not
+	# two storeys on a ladder: the house planner falls back to its legacy stair
+	# below about this (DBGSTAIR in house_plan_levels.gd; walk pin "stuck in
+	# the stairs" in a 6.6 x 8.6 m house)
+	if area < STAIR_MIN_AREA and style != &"townhouse":
+		storeys = 1
 	storeys = maxi(storeys, int(spec.ground_character().get("storeys_min", 0)))
+	var dims := house_dims(style, area, _seed_for(spec, "house|%d" % i))
+	return BuildingRequest.house(_seed_for(spec, "house|%d" % i), style, trade,
+		dims.x, dims.y, 2.6, storeys)
+
+
+const STAIR_MIN_AREA := 55.0
+
+## The sizes before VREAL-SIZE, kept for the compact display: the first
+## households biggest, HOUSE_SIZE_SPREAD either way about the wealth's size.
+const HOUSE_SIZE_SPREAD := 0.22
+
+static func _ramp_dims(spec: VillageSpec, i: int) -> Vector2:
 	var w: float = lerp(7.0, 10.0, clampf(spec.wealth, 0.0, 1.0))
 	var l: float = lerp(9.0, 13.0, clampf(spec.wealth, 0.0, 1.0))
 	var t: float = 0.5 if spec.households <= 1 else 1.0 - float(i) / float(spec.households - 1)
 	var size: float = 1.0 + HOUSE_SIZE_SPREAD * (2.0 * t - 1.0)
-	return BuildingRequest.house(_seed_for(spec, "house|%d" % i), style, trade,
-		snappedf(w * size, 0.1), snappedf(l * size, 0.1), 2.6, storeys)
+	return Vector2(snappedf(w * size, 0.1), snappedf(l * size, 0.1))
 
 
-## VILLAGES §9.3's `variety`: no one style is more than 45 % of the houses.
-## `_house_style` draws each house on its own, which for a rich village gives
-## townhouse and the base style two shares that cannot both be under 45 %, and
-## a thorpe of six came out five townhouses to one (EVAL-C11). A village rich
-## enough to mix (the check's own band, 0.55) and big enough to be judged
-## (five houses) is given three styles, the culture's cottage and farmhouse
-## as well as the townhouse, dealt in quotas: the townhouse the wealth's share
-## of them, up to the cap, the rest shared between the other two, and the
-## order shuffled from the seed so the big houses are not all one style.
-## Empty when the village is not one of those, and the draws stand.
+## Width (the frontage) and length of a house of `area` m2 in `style`, inside
+## the library's house envelope. The aspect is drawn from the house's seed.
+static func house_dims(style: StringName, area: float, house_seed: int) -> Vector2:
+	var range_: Vector2 = STYLE_ASPECT.get(style, ASPECT_DEFAULT)
+	var r := RandomNumberGenerator.new()
+	r.seed = hash("house_aspect|%d" % house_seed)
+	var aspect: float = lerpf(range_.x, range_.y, r.randf())
+	var w: float = sqrt(area / aspect)
+	var envelope: Dictionary = BuildingLibrary.KIND_ROWS[&"house"]
+	var l_max: float = float(envelope["length"]["max"])
+	if style == &"townhouse":
+		# narrow, and no deeper than its own plan allows: a big merchant's
+		# household goes UP (it has two storeys at least), never 25 m back.
+		# The frontage cap is the house's own, so a street of them is not one
+		# box repeated.
+		w = minf(w, lerpf(TOWNHOUSE_FRONT_MIN, TOWNHOUSE_FRONT_MAX, r.randf()))
+		l_max = minf(l_max, w * aspect * TOWNHOUSE_DEEP)
+	w = clampf(w, float(envelope["width"]["min"]), float(envelope["width"]["max"]))
+	var l: float = clampf(area / w, maxf(float(envelope["length"]["min"]), w), l_max)
+	return Vector2(snappedf(w, 0.1), snappedf(l, 0.1))
+
+
+## Which house each household lives in (VREAL-TYPES, docs/VILLAGE_REAL_LAYOUT.md):
+## the style follows the household's TRADE and SIZE and the village's
+## PURPOSE, never a coin. It used to be a draw (townhouse with probability
+## wealth, in any village), and a rich farming hamlet came out half
+## townhouses, which is a market town's house.
+##
+## * A farmer's household is a farmhouse when it is one of the bigger half
+##   of the farmers (the yeoman with byre and barn); the smaller half are
+##   smallholders in cottages.
+## * A townhouse is a merchant's or a craftsman's house in a place that
+##   trades: only in a TOWN_PURPOSES village (or one of
+##   TOWN_POPULATION), only for a household that does not farm, and the
+##   wealth's share of those households, at most STYLE_SHARE_CAP of the
+##   village, the biggest first. The smith keeps his cottage by the forge.
+## * Everyone else lives in a cottage; in a culture whose vernacular is the
+##   farmhouse (frankish, alpine) the bigger half of them keep that, and in
+##   any culture a household bigger than the real p75 house is a farmhouse
+##   (the big vernacular house, with its workshop), never a 190 m2 cottage.
+## Empty when the culture's base style is not cottage/farmhouse: those keep
+## their fixed style.
 const MIXING_WEALTH := 0.55
 const MIXING_MIN_HOUSES := 5
 const STYLE_SHARE_CAP := 0.45
+const FARMHOUSE_SHARE := 0.5
+const TOWN_PURPOSES: Array[StringName] = [&"market", &"crossroads", &"pilgrim", &"garrison"]
+const TOWN_POPULATION := 100
 
-static func _mixed_styles(spec: VillageSpec, styles: Dictionary) -> Array[StringName]:
+static func _mixed_styles(spec: VillageSpec, styles: Dictionary, areas: Array[float]) -> Array[StringName]:
 	var out: Array[StringName] = []
 	var base: StringName = styles["house"]
 	var n: int = spec.households
-	if base not in MIXABLE_HOUSE_STYLES or spec.wealth < MIXING_WEALTH or n < MIXING_MIN_HOUSES:
+	if base not in MIXABLE_HOUSE_STYLES or n <= 0:
 		return out
-	var other: StringName = &"farmhouse" if base == &"cottage" else &"cottage"
-	var cap: int = int(floorf(STYLE_SHARE_CAP * float(n) - 0.0001))
-	var townhouses: int = mini(cap, int(roundf(clampf(spec.wealth, 0.0, 1.0) * float(n))))
-	var rest: int = n - townhouses
-	var bases: int = mini(cap, int(ceilf(float(rest) * 0.5)))
-	for k in range(townhouses):
-		out.append(&"townhouse")
-	for k in range(bases):
-		out.append(base)
-	for k in range(rest - bases):
-		out.append(other)
-	var dealer := RandomNumberGenerator.new()
-	dealer.seed = hash("styles|%d" % spec.seed)
-	for k in range(out.size() - 1, 0, -1):
-		var j: int = dealer.randi_range(0, k)
-		var swap: StringName = out[k]
-		out[k] = out[j]
-		out[j] = swap
+	var big: float = float(VillageRealLayout.of(spec.effective_culture())["area_p75"])
+	var trades: Array[StringName] = []
+	var farmers: int = 0
+	for i in range(n):
+		trades.append(_trade_for(spec, i))
+		if trades[i] == &"farmer":
+			farmers += 1
+	var town: bool = spec.purpose in TOWN_PURPOSES or spec.population >= TOWN_POPULATION
+	var others: int = n - farmers
+	var cap: int = int(floorf(STYLE_SHARE_CAP * float(n) - 0.0001)) if n >= MIXING_MIN_HOUSES else n
+	var townhouses: int = mini(cap, int(roundf(clampf(spec.wealth, 0.0, 1.0) * float(others)))) if town else 0
+	var farmhouses: int = int(ceilf(float(farmers) * FARMHOUSE_SHARE))
+	var vernacular: int = int(ceilf(float(others - townhouses) * 0.5)) if base == &"farmhouse" else 0
+	# after the special trades, households are dealt biggest first
+	# (house_areas), so a running count IS the farmers' size rank
+	var farm_rank := 0
+	for i in range(n):
+		var style: StringName = &"cottage"
+		if trades[i] == &"farmer":
+			style = &"farmhouse" if farm_rank < farmhouses else &"cottage"
+			farm_rank += 1
+		elif townhouses > 0 and trades[i] != &"smith":
+			style = &"townhouse"
+			townhouses -= 1
+		elif vernacular > 0:
+			style = &"farmhouse"
+			vernacular -= 1
+		elif i < areas.size() and areas[i] > big:
+			style = &"farmhouse"
+		out.append(style)
 	return out
 
 

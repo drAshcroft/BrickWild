@@ -309,7 +309,9 @@ func _check_well(plan: VillagePlan) -> void:
 
 func _check_tavern(plan: VillagePlan) -> void:
 	var common: PackedVector2Array = VillageMeasure.common_poly(plan)
-	var gates: Array[Vector2] = VillageMeasure.gates(plan)
+	# by the gate a traveller comes in at: an open village's is where its road
+	# enters the houses, not where the site stops (VREAL-BODY)
+	var gates: Array[Vector2] = VillageMeasure.entrances(plan)
 	for i in VillageMeasure.shops_of(plan, &"tavern"):
 		var b: Dictionary = plan.buildings[i]
 		var lot: Dictionary = plan.lots[int(b["lot"])]
@@ -630,7 +632,8 @@ func _check_gradient(plan: VillagePlan) -> void:
 		return
 	var houses: Array[int] = []
 	for i in plan.buildings_of_kind(&"house"):
-		if (plan.buildings[i]["request"] as BuildingRequest).purpose != &"farmer":
+		# a farm is the lot class (a smallholder's cottage is not one, VREAL-TYPES)
+		if plan.buildings[i]["class"] != &"farm":
 			houses.append(i)
 	if houses.size() < 5:
 		return
@@ -655,7 +658,7 @@ func _check_farms(plan: VillagePlan) -> void:
 	var edge: PackedVector2Array = plan.enclosure if plan.enclosure.size() >= 3 else Poly.from_rect(plan.site)
 	for i in plan.buildings_of_kind(&"house"):
 		var b: Dictionary = plan.buildings[i]
-		if (b["request"] as BuildingRequest).purpose != &"farmer":
+		if b["class"] != &"farm":
 			continue
 		var c: Vector2 = VillageMeasure.centre(VillageMeasure.footprint_poly(b))
 		var reach_rect: Rect2 = plan.site

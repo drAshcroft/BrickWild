@@ -160,6 +160,16 @@ hole, with the court itself paved a hand's breadth down.
 
 ## Furnishing
 
+Before any room is furnished an ordinary house gets a **household brief**
+(`HouseHousehold`, HOME-BRIEF): a head-count from its floor, the beds it needs and
+the places its one table is laid for (at most six). A one-storey, no-trade
+cottage, thatched cottage or farmhouse built before 1700 lives in a **living
+hall**: no separate kitchen, the fire, cooking and the household table in the
+hall (HOME-HEARTH). `period_seating`
+decides whether a sitting parlour keeps a side table (`with_table`, the default)
+or only a settle on its wall (`without_table`, strict pre-1720 history). See
+[INTERIOR_DESIGN.md](INTERIOR_DESIGN.md) section 6; suite `hhousehold`.
+
 Each room kind has a recipe of steps, and each step is a rule rather than a
 coordinate:
 
@@ -338,6 +348,10 @@ needs in front of it. Sizes are never authored by hand there, because a guessed
 footprint is how furniture ends up half inside a wall.
 
 ## Sources for the rules
+
+- The interior design course, the household-level rules BrickWild lacked, the
+  audit that measures them and the real-data comparison: [INTERIOR_DESIGN.md](INTERIOR_DESIGN.md)
+  (research notes in [interior/](interior/)).
 
 - Merrell et al., *Interactive Furniture Layout Using Interior Design
   Guidelines* (SIGGRAPH 2011) — the idea of encoding design guidelines as

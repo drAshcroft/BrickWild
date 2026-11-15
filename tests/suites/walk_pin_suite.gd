@@ -4,8 +4,9 @@ extends RefCounted
 ## is SILENT on the same room put right. A rule that cannot fail is the
 ## seating rule that passed every backwards chair for a week.
 ##
-## The rooms are real: the pinned cottage (house cottage seed 1) for the hall,
-## bedroom and kitchen, and the pinned domus (world courtyard_house seed 1)
+## The rooms are real: the pinned cottage (house cottage seed 1) for the hall
+## and bedroom, the same cottage dated 1800 for the kitchen (a cottage of 1200
+## cooks in its hall, HOME-HEARTH), and the pinned domus (world courtyard_house seed 1)
 ## for the big rooms. Their furniture is cleared and only the fixture placed,
 ## so a change to the furnisher cannot make a fixture pass or fail.
 ##   godot --headless --path . --script res://tests/run_all.gd -- walkpins
@@ -20,7 +21,9 @@ static func run() -> SuiteResult:
 		return res
 	_hall(res, cottage)
 	_bedroom(res, cottage)
-	_kitchen(res, cottage)
+	# A cottage of 1200 lives in its hall and has no kitchen (HOME-HEARTH); the
+	# kitchen fixture borrows the same cottage dated 1800, which keeps one.
+	_kitchen(res, _bare(&"house", &"cottage", 1800))
 	_big_room(res, domus)
 	_corridor(res, domus)
 	_stairs(res)
@@ -30,9 +33,11 @@ static func run() -> SuiteResult:
 
 
 ## The pinned building through the public path, with its furniture cleared.
-static func _bare(kind: StringName, style: StringName) -> HousePlan:
+static func _bare(kind: StringName, style: StringName, period := -1) -> HousePlan:
 	var req := BrickWild.default_request(kind, 1)
 	req.style = style
+	if period > 0:
+		req.period = period
 	var b := BrickWild.generate(req)
 	var plan := b.plan as HousePlan
 	if plan != null:
@@ -211,6 +216,9 @@ static func _bedroom(res: SuiteResult, plan: HousePlan) -> void:
 
 
 static func _kitchen(res: SuiteResult, plan: HousePlan) -> void:
+	if plan == null:
+		res.fail("the pinned cottage of 1800 no longer generates")
+		return
 	var room := _room(plan, &"kitchen")
 	if room < 0:
 		res.fail("the pinned cottage has no kitchen")

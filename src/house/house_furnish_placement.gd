@@ -1364,6 +1364,10 @@ static func _place_against_wall(plan: HousePlan, room: int, key: String,
 		and String(step.get("group", "")) == "cooking" and PropCatalog.category(key) == "storage"
 	var wall_scales: Array = _domestic_prep_scales(key) \
 		if compact_witchwork_wall or witch_cooking_storage else HouseFurnishGeometry.scales(key)
+	# A step may name its scales: the parlour's side table is the catalogue
+	# trestle at its smallest plan scale, at full height (period_seating).
+	if step.has("scales"):
+		wall_scales = step["scales"]
 	for wi in range(walls.size()):
 		if hearth_only >= 0 and wi != hearth_only:
 			continue

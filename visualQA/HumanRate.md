@@ -1377,3 +1377,156 @@ Tour: sprint_2026_10_26, stop 1 / 22 — shop wares: the mortar, the still and t
    - ![pin 1](walk_shots/1a17b7f6b85a72097d1_1.png)
 <!-- /human-walk 1a17b7f6b85a72097d1 -->
 
+<!-- human-walk 1a1b3e4cded525e2209 village -->
+## Walk — Village: english / mill, seed 1 — 2026-11-07T02:44:39Z
+
+Building: English mill village on flat ground · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":1.0,"kind":"village","length":50.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"mill","schema":"brickwild.request","schema_version":1,"seed":"1","storeys":1,"style":"english","water":"none","width":50.0}`
+
+Re-open: `.\visualqa\walk.ps1 --villages=mixed --stop=1 --seed=1`
+
+Village series: mixed, village 1 / 12 — English mill village on a stream: thatch, a rich house, post and tower mills, a wizard's tower
+
+- [ ] pretty
+- [ ] collisions
+- [ ] window problems
+- [x] door problems
+- [ ] roof problems
+
+### Pins (3)
+
+1. **door** (bug) — there is no doors anywhere?
+   - at (102.86, 1.15, 16.68) (building-local), normal (0.16, 0.00, 0.99), hit `Buildings/shop_2/Shell`
+   - building 2. cottage shop (blacksmith), at [0.679, 1.148, 2.751] in its own frame; alone: `.\visualqa\walk.ps1 --kind=shop --seed=296989936 --style=cottage --purpose=blacksmith --width=11.0 --length=14.0 --height=2.8`
+   - camera (104.41, 1.72, 18.80) looking (-0.58, -0.21, -0.79)
+   - ![pin 1](walk_shots/1a1b3e4cded525e2209_1.png)
+2. **door** (bug) — same here, there is the opening, but no door
+   - at (107.24, 1.22, 15.55) (building-local), normal (-0.16, 0.00, -0.99), hit `Buildings/shop_2/Shell`
+   - building 2. cottage shop (blacksmith), at [5.182, 1.22, 2.325] in its own frame; alone: `.\visualqa\walk.ps1 --kind=shop --seed=296989936 --style=cottage --purpose=blacksmith --width=11.0 --length=14.0 --height=2.8`
+   - camera (106.06, 1.72, 14.71) looking (0.77, -0.33, 0.55)
+   - ![pin 2](walk_shots/1a1b3e4cded525e2209_2.png)
+3. **ground / terrain** (bug) — Towns are not so incredibly spaced out with huge houses.  this is just a rich people stuff?
+   - at (79.28, 0.01, 8.36) (building-local), normal (0.00, 1.00, 0.00), hit `Ground`
+   - camera (94.82, 1.60, 21.66) looking (-0.76, -0.08, -0.65)
+   - ![pin 3](walk_shots/1a1b3e4cded525e2209_3.png)
+<!-- /human-walk 1a1b3e4cded525e2209 -->
+
+<!-- human-walk 1a1b3eae194e1fd4d09 village -->
+## Walk — Village: frankish / market, seed 2 — 2026-11-07T02:51:17Z
+
+Building: Frankish market village on flat ground · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":1.0,"kind":"village","length":60.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"market","schema":"brickwild.request","schema_version":1,"seed":"2","storeys":1,"style":"frankish","water":"none","width":70.0}`
+
+Re-open: `.\visualqa\walk.ps1 --villages=mixed --stop=2 --seed=2`
+
+Village series: mixed, village 2 / 12 — Frankish market: a gothic church beside the romanesque one, a restaurant, a library, a basilica temple
+
+- [ ] pretty
+- [ ] collisions
+- [ ] window problems
+- [x] door problems
+- [ ] roof problems
+
+### Pins (3)
+
+1. **wall** (bug) — big gap in the wall
+   - at (41.58, 0.93, 11.35) (building-local), normal (-0.99, 0.00, 0.14), hit `Buildings/church_0/Shell`
+   - building 0. romanesque church, at [-3.792, 0.932, 9.665] in its own frame; alone: `.\visualqa\walk.ps1 --kind=church --seed=3629060240 --style=romanesque --width=10.0 --length=20.0 --height=12.0`
+   - camera (36.49, 1.61, 7.69) looking (0.81, -0.11, 0.58)
+   - ![pin 1](walk_shots/1a1b3eae194e1fd4d09_1.png)
+2. **door** (bug) — weird door that is not actually a double door
+   - at (22.48, 1.10, 8.78) (building-local), normal (-0.00, 0.00, -1.00), hit `Buildings/church_0/Shell`
+   - building 0. romanesque church, at [-1.225, 1.095, -9.438] in its own frame; alone: `.\visualqa\walk.ps1 --kind=church --seed=3629060240 --style=romanesque --width=10.0 --length=20.0 --height=12.0`
+   - camera (25.73, 1.61, 7.42) looking (-0.91, -0.14, 0.38)
+   - ![pin 2](walk_shots/1a1b3eae194e1fd4d09_2.png)
+3. **furniture / prop** (bug) — broken shelf/dressar thing that are overlapping
+   - at (36.50, 1.11, -36.72) (building-local), normal (0.00, 1.00, 0.00), hit `Buildings/house_9/Furniture/Cabinet/Cabinet`
+   - building 9. townhouse house (smith), at [-4.745, 1.113, -4.722] in its own frame; alone: `.\visualqa\walk.ps1 --kind=house --seed=1936262755 --style=townhouse --purpose=smith --width=10.7 --length=13.9 --height=2.6`
+   - camera (36.62, 1.72, -38.29) looking (-0.07, -0.36, 0.93)
+   - ![pin 3](walk_shots/1a1b3eae194e1fd4d09_3.png)
+<!-- /human-walk 1a1b3eae194e1fd4d09 -->
+
+<!-- human-walk 1a1b3ef42927e6215e6 village -->
+## Walk — Village: norse / fishing, seed 3 — 2026-11-07T02:56:04Z
+
+Building: Norse fishing village on flat ground · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":1.0,"kind":"village","length":40.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"fishing","schema":"brickwild.request","schema_version":1,"seed":"3","storeys":1,"style":"norse","water":"none","width":45.0}`
+
+Re-open: `.\visualqa\walk.ps1 --villages=mixed --stop=3 --seed=3`
+
+Village series: mixed, village 3 / 12 — Norse fishing strand on the coast: longhalls, a roundhouse, a stave church, a dark keep
+
+- [ ] pretty
+- [ ] collisions
+- [ ] window problems
+- [ ] door problems
+- [ ] roof problems
+
+### Pins (1)
+
+1. **ground / terrain** (bug) — so far away?
+   - at (-124.82, 0.82, -2.33) (building-local), normal (-0.63, 0.00, -0.77), hit `Buildings/house_11/Shell`
+   - building 11. roundhouse house, at [-2.02, 0.816, -3.853] in its own frame; alone: `.\visualqa\walk.ps1 --kind=house --seed=286984 --style=roundhouse --purpose=none --width=9.0 --length=12.0 --height=2.6`
+   - camera (-129.07, 1.61, -5.90) looking (0.76, -0.14, 0.64)
+   - ![pin 1](walk_shots/1a1b3ef42927e6215e6_1.png)
+<!-- /human-walk 1a1b3ef42927e6215e6 -->
+
+<!-- human-walk 1a1b3f1ee7dbc89fd89 village -->
+## Walk — Village: alpine / farming, seed 4 — 2026-11-07T02:58:59Z
+
+Building: Alpine farming village on flat ground · cutaway: no · solid furniture: yes
+
+Request: `{"enclosure":"none","height":1.0,"kind":"village","length":50.0,"material":"timber","orientation":0.0,"period":1200,"purpose":"farming","schema":"brickwild.request","schema_version":1,"seed":"4","storeys":1,"style":"alpine","water":"none","width":60.0}`
+
+Re-open: `.\visualqa\walk.ps1 --villages=mixed --stop=4 --seed=4`
+
+Village series: mixed, village 4 / 12 — Alpine farming green: farmhouses, a renaissance church, a Bavarian castle, a sky castle, a bathhouse
+
+- [ ] pretty
+- [ ] collisions
+- [ ] window problems
+- [x] door problems
+- [ ] roof problems
+
+### Pins (7)
+
+1. **wall** (bug) — gap
+   - at (-9.02, 2.13, 23.66) (building-local), normal (1.00, 0.00, 0.00), hit `Buildings/church_0/Shell`
+   - building 0. renaissance church, at [-4.36, 2.133, 9.657] in its own frame; alone: `.\visualqa\walk.ps1 --kind=church --seed=2966600274 --style=renaissance --width=10.0 --length=20.0 --height=12.0`
+   - camera (-3.81, 1.61, 18.67) looking (-0.72, 0.07, 0.69)
+   - ![pin 1](walk_shots/1a1b3f1ee7dbc89fd89_1.png)
+2. **stair / floor** (bug) — unusable stairs
+   - at (44.59, 1.49, 16.18) (building-local), normal (-0.33, 0.00, 0.94), hit `Buildings/castle_1/Shell`
+   - building 1. bavarian castle, at [-10.959, 1.487, -14.869] in its own frame; alone: `.\visualqa\walk.ps1 --kind=castle --seed=895758 --style=bavarian --width=30.0 --length=34.0 --height=18.0`
+   - camera (43.85, 2.03, 17.45) looking (0.47, -0.35, -0.81)
+   - ![pin 2](walk_shots/1a1b3f1ee7dbc89fd89_2.png)
+3. **stair / floor** (bug) — unusable stairs.  no rails
+   - at (46.22, 1.48, 18.60) (building-local), normal (0.33, 0.00, -0.94), hit `Buildings/castle_1/Shell`
+   - building 1. bavarian castle, at [-12.701, 1.485, -12.528] in its own frame; alone: `.\visualqa\walk.ps1 --kind=castle --seed=895758 --style=bavarian --width=30.0 --length=34.0 --height=18.0`
+   - camera (49.35, 1.72, 16.51) looking (-0.83, -0.06, 0.55)
+   - ![pin 3](walk_shots/1a1b3f1ee7dbc89fd89_3.png)
+4. **door** (bug) — entrance or fireplace?
+   - at (68.17, 1.33, 12.33) (building-local), normal (-0.94, 0.00, -0.33), hit `Buildings/castle_1/Shell`
+   - building 1. bavarian castle, at [0.47, 1.332, 6.12] in its own frame; alone: `.\visualqa\walk.ps1 --kind=castle --seed=895758 --style=bavarian --width=30.0 --length=34.0 --height=18.0`
+   - camera (64.85, 1.61, 12.03) looking (0.99, -0.08, 0.09)
+   - ![pin 4](walk_shots/1a1b3f1ee7dbc89fd89_4.png)
+5. **furniture / prop** (bug) — bench in front of the stairs
+   - at (71.23, 9.63, 1.50) (building-local), normal (-0.02, 1.00, 0.02), hit `Buildings/castle_1/wing_right/Furniture/@Node3D@4332/Bench`
+   - building 1. bavarian castle, at [11.698, 9.628, 5.429] in its own frame; alone: `.\visualqa\walk.ps1 --kind=castle --seed=895758 --style=bavarian --width=30.0 --length=34.0 --height=18.0`
+   - camera (69.19, 10.72, 0.95) looking (0.86, -0.46, 0.23)
+   - ![pin 5](walk_shots/1a1b3f1ee7dbc89fd89_5.png)
+6. **door** (bug) — blocked door hidden behind stairs
+   - at (53.19, 0.12, -40.58) (building-local), normal (0.00, 1.00, 0.00), hit `Buildings/house_20/Shell`
+   - building 20. townhouse house (farmer), at [2.408, 0.12, -1.449] in its own frame; alone: `.\visualqa\walk.ps1 --kind=house --seed=3902731609 --style=townhouse --purpose=farmer --width=6.6 --length=8.6 --height=2.6`
+   - camera (54.11, 1.72, -39.67) looking (-0.45, -0.78, -0.44)
+   - ![pin 6](walk_shots/1a1b3f1ee7dbc89fd89_6.png)
+7. **stair / floor** (bug) — stuck in the stairs
+   - at (53.28, 2.92, -37.78) (building-local), normal (0.11, 0.00, -0.99), hit `Buildings/house_20/Shell`
+   - building 20. townhouse house (farmer), at [2.004, 2.918, -4.22] in its own frame; alone: `.\visualqa\walk.ps1 --kind=house --seed=3902731609 --style=townhouse --purpose=farmer --width=6.6 --length=8.6 --height=2.6`
+   - camera (56.15, 2.69, -40.41) looking (-0.74, 0.06, 0.67)
+   - ![pin 7](walk_shots/1a1b3f1ee7dbc89fd89_7.png)
+<!-- /human-walk 1a1b3f1ee7dbc89fd89 -->
+

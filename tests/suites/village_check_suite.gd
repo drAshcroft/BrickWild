@@ -367,6 +367,9 @@ static func _place_fixtures(res: SuiteResult, base: VillagePlan) -> void:
 			var detached: BuildingRequest = (p12.buildings[i]["request"] as BuildingRequest).copy()
 			detached.purpose = &"none"
 			p12.buildings[i]["request"] = detached
+			# the rule now reads the LOT class (a smallholder's cottage is not a
+			# farm, VREAL-TYPES), so an ordinary house is a cottage lot too
+			p12.buildings[i]["class"] = &"cottage"
 		var order: Array = houses.duplicate()
 		order.sort_custom(func(a, b) -> bool:
 			return VillageMeasure.centre(VillageMeasure.footprint_poly(p12.buildings[a])).distance_to(cc) \

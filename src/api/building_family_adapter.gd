@@ -892,6 +892,9 @@ static func _copy_orientation_and_period(request: BuildingRequest, spec: RefCoun
 	if "ground_fall" in spec:
 		spec.set("ground_fall", request.ground_fall_m)
 		spec.set("ground_downhill_deg", request.ground_downhill_deg)
+	# where idle seats may stand (houses; validate() refuses it elsewhere)
+	if "period_seating" in spec:
+		spec.set("period_seating", request.period_seating)
 	# piles over water: houses and shops only (validate() refuses the rest)
 	if "foundation" in spec:
 		spec.set("foundation", request.foundation)

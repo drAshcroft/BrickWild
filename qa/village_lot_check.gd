@@ -9,7 +9,7 @@ extends RefCounted
 ##   FACES_ROAD     the house looks at the street
 ##   SETBACK        the door is a few steps from the road, by its kind
 ##   FIT            the building is on its lot, with the fire gap as margin
-##   FIRE_GAP       neighbours do not touch, terraces excepted where allowed
+##   FIRE_GAP       neighbours do not touch, terraces and party sides excepted
 ##   BACK_TO_FRONT  no house stares at a blank wall
 ##   VARIETY        no two neighbours are the same house, and no style owns
 ##                  the village
@@ -89,7 +89,8 @@ func _check_frontage(plan: VillagePlan) -> void:
 		if b >= 0:
 			var fp: Rect2 = plan.buildings[b]["placement"]["footprint"]
 			var have: float = front[0].distance_to(front[1])
-			if have < fp.size.x + VillageLotPlanner.frontage_slack(plan.spec) - 0.01:
+			# a party side (VREAL-PACK) gives up half the slack to the neighbour's eaves
+			if have < fp.size.x + VillageLotPlanner.frontage_need(plan.spec, lot) - 0.01:
 				failures.append("frontage: lot %d's front is %.1fm for a %.1fm building" % [i, have, fp.size.x])
 
 
@@ -157,6 +158,8 @@ func _check_fire_gap(plan: VillagePlan) -> void:
 	for i in range(plan.buildings.size()):
 		var a: PackedVector2Array = VillageMeasure.bounds_poly(plan.buildings[i])
 		for j in range(i + 1, plan.buildings.size()):
+			if VillageLotPlanner.party_pair(plan, i, j):
+				continue # joined at a party side (VREAL-PACK); the lots still tile
 			var want: float = maxf(VillageLotPlanner.fire_gap(plan.buildings[i]["class"], plan.spec, plan.buildings[i]["placement"]),
 				VillageLotPlanner.fire_gap(plan.buildings[j]["class"], plan.spec, plan.buildings[j]["placement"]))
 			var d: float = VillageMeasure.poly_distance(a, VillageMeasure.bounds_poly(plan.buildings[j]))
@@ -202,14 +205,16 @@ func _check_variety(plan: VillagePlan) -> void:
 	for i2 in houses:
 		var st: StringName = (plan.buildings[i2]["request"] as BuildingRequest).style
 		styles[st] = int(styles.get(st, 0)) + 1
-	# the programmer moves houses from cottage to townhouse with wealth, so
-	# below the middle of the band the majority style is the village's
-	# style by design; only a village rich enough to mix is held to a share
+	# Wealth moves households from cottage to townhouse, and a thorpe of six
+	# once came out five townhouses to one (EVAL-C11): the townhouse is held
+	# to a share. The farmhouse and the cottage are not: they follow the
+	# households' trades (VREAL-TYPES), and a farming village that is mostly
+	# farmhouses and smallholders' cottages is what one is.
 	for st in styles:
 		var share: float = float(styles[st]) / float(maxi(houses.size(), 1))
 		stats["style_" + String(st)] = styles[st]
-		if houses.size() >= 5 and share > STYLE_SHARE_MAX and plan.spec.form != &"planted" \
-				and styles.size() > 1 and plan.spec.wealth >= MIXING_WEALTH:
+		if st == &"townhouse" and houses.size() >= 5 and share > STYLE_SHARE_MAX \
+				and plan.spec.form != &"planted" and styles.size() > 1 and plan.spec.wealth >= MIXING_WEALTH:
 			failures.append("variety: %.0f%% of the houses are %s" % [share * 100.0, String(st)])
 
 

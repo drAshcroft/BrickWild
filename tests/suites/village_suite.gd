@@ -18,6 +18,7 @@ static func run() -> SuiteResult:
 	_check_programme_house_count(res)
 	_check_programme_earned_kinds_sweep(res)
 	_check_programme_storeys_and_style_mix(res)
+	_check_programme_real_sizes(res)
 	_check_programme_trades(res)
 	_check_programme_special_trades_gated(res)
 	_check_programme_no_house_family_import(res)
@@ -455,24 +456,108 @@ static func _check_programme_storeys_and_style_mix(res: SuiteResult) -> void:
 	var rich_reqs: Array[BuildingRequest] = VillageProgrammer.programme(rich)
 	res.checked += 1
 	for r in rich_reqs:
-		if r.kind == &"house" and r.storeys != 2:
-			res.fail("wealth 0.9 house has storeys %d, want 2" % r.storeys)
+		# a house too small for a climbable flight keeps one storey at any
+		# wealth (VillageProgrammer.STAIR_MIN_AREA)
+		if r.kind == &"house" and r.storeys != 2 and r.width * r.length >= VillageProgrammer.STAIR_MIN_AREA:
+			res.fail("wealth 0.9 house of %.0f m2 has storeys %d, want 2" % [r.width * r.length, r.storeys])
 			break
 
 	# cottage/townhouse mix: more townhouse-styled houses at high wealth
-	# than at low wealth, for a culture whose base style is cottage.
+	# than at low wealth, for a culture whose base style is cottage -- in a
+	# village that trades (VREAL-TYPES). A farming village has none at any
+	# wealth: a townhouse is a merchant's house.
+	var poor_market: VillageSpec = _make_spec(203, 80, &"english", &"market", 0.1)
+	poor_market.generate(203)
+	var rich_market: VillageSpec = _make_spec(204, 80, &"english", &"market", 0.9)
+	rich_market.generate(204)
 	var poor_townhouses := 0
-	for r in poor_reqs:
+	for r in VillageProgrammer.programme(poor_market):
 		if r.kind == &"house" and r.style == &"townhouse":
 			poor_townhouses += 1
 	var rich_townhouses := 0
-	for r in rich_reqs:
+	for r in VillageProgrammer.programme(rich_market):
 		if r.kind == &"house" and r.style == &"townhouse":
 			rich_townhouses += 1
 	res.checked += 1
 	if not (rich_townhouses > poor_townhouses):
-		res.fail("wealth should move the house mix toward townhouse: poor=%d rich=%d" % [
+		res.fail("wealth should move a market village's houses toward townhouse: poor=%d rich=%d" % [
 			poor_townhouses, rich_townhouses])
+	var farm_townhouses := 0
+	for r in rich_reqs:
+		if r.kind == &"house" and r.style == &"townhouse":
+			farm_townhouses += 1
+	res.checked += 1
+	if farm_townhouses > 0:
+		res.fail("a farming village has no townhouses at any wealth: %d at 0.9" % farm_townhouses)
+
+
+## VREAL-SIZE / VREAL-TYPES (docs/VILLAGE_REAL_LAYOUT.md): the households'
+## footprints are the real old villages' distribution, not a ramp, and the
+## house a household lives in makes sense for it. Programme only; no planning.
+## Pooled over twelve villages of each culture so one seed's draw does not
+## decide it. The control: the old ramp (7-10 x 9-13 m, +-22 %) is too
+## narrow to pass the spread rule, so the rule can fail.
+static func _check_programme_real_sizes(res: SuiteResult) -> void:
+	for culture in [&"english", &"frankish", &"mediterranean", &"norse"]:
+		var real: Dictionary = VillageRealLayout.of(culture)
+		var logs := PackedFloat64Array()
+		var cottages_too_big := 0
+		var big_two_storey := 0
+		for k in range(12):
+			var purpose: StringName = [&"farming", &"market", &"mill", &"fishing"][k % 4]
+			var spec: VillageSpec = _make_spec(7000 + k, 60, culture, purpose, 0.5)
+			spec.generate(7000 + k)
+			for r in VillageProgrammer.programme(spec):
+				if r.kind != &"house":
+					continue
+				var area: float = r.width * r.length
+				logs.append(log(area))
+				if r.style == &"cottage" and area > float(real["area_p75"]) + 1.0:
+					cottages_too_big += 1
+				if r.style != &"townhouse" and r.storeys > 1 and area > float(real["area_p75"]) + 1.0:
+					big_two_storey += 1
+				if r.style == &"townhouse" and purpose in [&"farming", &"mill", &"fishing"]:
+					res.fail("%s %s village: a townhouse (%s)" % [culture, purpose, r.purpose])
+		var mean := 0.0
+		for v in logs:
+			mean += v
+		mean /= float(logs.size())
+		var sd := 0.0
+		for v in logs:
+			sd += (v - mean) * (v - mean)
+		sd = sqrt(sd / float(logs.size()))
+		var median: float = exp(mean)
+		res.checked += 4
+		# the median house within 25 % of the real one, and a spread no ramp
+		# has: the old one measured 0.26 against a real per-site 0.65
+		if absf(log(median / float(real["area_p50"]))) > log(1.25):
+			res.fail("%s: median house %.0f m2, real %.0f" % [culture, median, real["area_p50"]])
+		if sd < SPREAD_FLOOR:
+			res.fail("%s: house size log-spread %.2f, real %.2f: too uniform" % [culture, sd, real["log_sd"]])
+		if cottages_too_big > 0:
+			res.fail("%s: %d cottages bigger than the real p75 house (%.0f m2)" % [culture, cottages_too_big, real["area_p75"]])
+		if big_two_storey > 0:
+			res.fail("%s: %d houses over the real p75 are two storeys at wealth 0.5" % [culture, big_two_storey])
+	# control: the old ramp is too uniform for the spread rule
+	var ramp := PackedFloat64Array()
+	for i in range(11):
+		var t: float = 1.0 - float(i) / 10.0
+		var s: float = 1.0 + 0.22 * (2.0 * t - 1.0)
+		ramp.append(log(8.5 * s * 11.0 * s))
+	var rm := 0.0
+	for v in ramp:
+		rm += v
+	rm /= float(ramp.size())
+	var rsd := 0.0
+	for v in ramp:
+		rsd += (v - rm) * (v - rm)
+	rsd = sqrt(rsd / float(ramp.size()))
+	res.checked += 1
+	if rsd >= SPREAD_FLOOR:
+		res.fail("control: the old ramp's log-spread %.2f should fail the %.2f floor" % [rsd, SPREAD_FLOOR])
+
+
+const SPREAD_FLOOR := 0.33
 
 
 static func _check_programme_trades(res: SuiteResult) -> void:

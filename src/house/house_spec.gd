@@ -124,9 +124,26 @@ var roof_span_out: float = -1.0
 var roof_along_out: float = -1.0
 ## Chosen before planning, so clear floor, openings and emitted masonry agree.
 var material: StringName = &"timber" # timber | stone
-## Site frame metadata. These do not participate in seeded plan generation.
+## Site frame metadata. `orientation` does not participate in seeded plan
+## generation. `period` chooses grammar, never a draw from `rng`: before
+## LIVING_HALL_BEFORE an ordinary cottage, thatched cottage or farmhouse lives
+## round its fire in the hall and has no separate kitchen (HOME-HEARTH;
+## docs/INTERIOR_DESIGN.md section 3).
 var orientation: float = 0.0
 var period: int = 1200
+## Where idle seats may stand without a table (docs/INTERIOR_DESIGN.md,
+## GUIDES H4). `with_table` (the default): a room of seats always has a table
+## or the fire to serve; a sitting parlour keeps a small table set against its
+## wall with its seats at it -- a side table, not a second dining table.
+## `without_table`: strict history before c.1720 -- seats rest against the
+## walls and the table is put away, so a sitting parlour holds a settle and no
+## table. Never drawn from `rng`.
+var period_seating: StringName = SEATING_WITH_TABLE
+const SEATING_WITH_TABLE := &"with_table"
+const SEATING_WITHOUT_TABLE := &"without_table"
+const SEATING_OPTIONS: Array[StringName] = [SEATING_WITH_TABLE, SEATING_WITHOUT_TABLE]
+## Before this year the fire room is the living room (HOME-HEARTH).
+const LIVING_HALL_BEFORE := 1700
 ## Falling ground (VTER-HOUSE-SLOPE): metres of fall across the footprint and
 ## the downhill direction in the house's own frame (0 = toward the front, -Z;
 ## 90 = toward +X). Zero is flat ground, and a flat house is untouched. Never
@@ -375,6 +392,10 @@ const STYLES := {
 		# (`eyebrow`, read without a draw). Soft thatch: HouseGeometry.thatch_soft.
 		"timber": 0.0, "studs": [1.0, 1.5], "braces": 0.0, "rail": 0.0,
 		"eyebrow": 1,
+		# The cottage's household under a different roof (HOME-HEARTH). Without
+		# a domestic programme the old partition path gave it a 13 m2 hall and
+		# 22 m2 stores, and a hall that cooks could not also seat its table.
+		"domestic_program": [&"hall", &"bedroom", &"kitchen", &"bedroom", &"store", &"parlour"],
 		"roof_pitch": [1.15, 1.5], "porch": 0.6, "chimney": 0.85, "shutters": 0.4,
 		"wall": ["efe7d3", "dbcfb4"], "trim": ["4a3826", "322518"],
 		"roof": ["bda25f", "8d7640"], "floor": ["8a7a5e", "6f6148"],

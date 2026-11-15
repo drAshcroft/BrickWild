@@ -247,7 +247,7 @@ the roads themselves are never lots.
 | Lot rule | Value |
 |---|---|
 | **setback** — door to road edge | cottage 1.5 – 6 m; townhouse 0 – 1 m; farm 4 – 12 m; church 6 – 15 m; manor ≥ 20 m on its own lane |
-| **fire gap** — between building bounds | cottage ≥ 1.5 m; farm ≥ 6 m; townhouse may touch its neighbours (a terrace) when `wealth ≥ 0.5` and `form = planted` |
+| **fire gap** — between building bounds | cottage ≥ 1.5 m; farm ≥ 6 m; townhouse may touch its neighbours (a terrace) when `wealth ≥ 0.5` and `form = planted`; and an ordinary house or shop may JOIN one neighbour at a party side, eaves 0.1 m apart, in the share the culture's real villages touch (VREAL-PACK, `VillageLotPlanner._try_join`; both lots record `party`) |
 | **front** — building local −Z toward the front edge | within 15°; every family's front is −Z (`BrickWild.placement()`), so this is one rule for all of them |
 | **fit** — `placement().bounds` inside the lot | with the fire gap as margin |
 | **yard** — the rest of the lot | garden, orchard, hedge, props by trade |
@@ -330,7 +330,7 @@ as a scatter.
 | **town hall / guildhall** | on the square, its front to it | |
 | **manor / keep** | at the head of the village at the far end of a lane, its own footprint clear ≥ 15 m all round, its gate facing the village | the lord looks down the street |
 | **farms** | at the edge, on lanes, their yards toward the fields | |
-| **hovels and big houses** | the bigger and taller houses nearer the common, one-room cottages at the edge | the wealth gradient every real village has |
+| **hovels and big houses** | the bigger and taller houses tend to stand nearer the common, one-room cottages toward the edge -- a tendency, not rings | the historic survey's villages show almost none (size against distance from the middle: median Spearman +0.06, strongest Monteriggioni -0.70; docs/VILLAGE_REAL_LAYOUT.md); a perfect ring reads as generated |
 | **the outside** | strip fields on the `farming` side, orchards behind the farms, pasture with fences, a wood on the far side, the churchyard's yews, the mill pond | the village is bounded because the outside is different |
 
 ---
@@ -537,7 +537,11 @@ changes came with it, and each is a rule the checks were already measuring:
   empty while the through road filled up (`common` measured 50 %).
 - **The wealth gradient is enforced, not hoped for**: households are handed
   over biggest first and no house may stand nearer the common than a bigger
-  one already does, less a few metres of slack.
+  one already does, less a few metres of slack. (VREAL-GRADIENT, Nov 2026:
+  that made a ring, Spearman -0.88 to -0.96, where real villages read about
+  0. The order is now each household's size rank plus a seeded jitter, and
+  the floor is the MEDIAN of the bigger households' distances, not the
+  farthest; the walk stops read -0.38 to -0.69, inside the rule.)
 - **The tavern takes the upwind gate and the smithy the downwind edge**, so
   the two stop competing for the same end of the through road.
 - **Farms are out of the gradient and into their own rule.** A farmhouse is a
@@ -618,11 +622,11 @@ village is the building most in need of being *looked at*.
 | Rule | The sentence | The measurement |
 |---|---|---|
 | **tiling** | lots do not overlap each other, the roads, the common or the water | pairwise polygon intersection area = 0 |
-| **frontage** | every lot has a road | each lot has a `front` edge collinear with a road edge, length ≥ building width + 1 m |
+| **frontage** | every lot has a road | each lot has a `front` edge collinear with a road edge, length ≥ building width + 1 m, less half a metre per party side (`VillageLotPlanner.frontage_need`) |
 | **faces the road** | the house looks at the street | the angle between `placement().front` (local −Z) and the front edge's inward normal ≤ 15° |
 | **setback** | the door is a few steps from the road | distance from the door (from the plan for houses/shops; from the gate mass for castles; from the west door for churches) to the road edge within the §5 range for its kind |
 | **fit** | the building is on its lot | `placement().bounds` inside the lot polygon with the fire gap as margin |
-| **fire gap** | neighbours do not touch | `MassRules.separation` between any two buildings ≥ the §5 gap, terraces excepted where allowed |
+| **fire gap** | neighbours do not touch | `MassRules.separation` between any two buildings ≥ the §5 gap, terraces and party sides (`VillageLotPlanner.party_pair`) excepted |
 | **not back to front** | no house stares at a blank wall | no building's front faces another's back at < 8 m |
 | **variety** | no two neighbours are the same house | adjacent buildings differ in (style, storeys, footprint rounded to 0.5 m) or in seed-derived variant; no style is > 45 % of houses unless `form = planted` |
 

@@ -358,6 +358,44 @@ static func plan_measured(spec: VillageSpec, jobs: Array[Dictionary]) -> Village
 		out = best
 	for job in jobs:
 		job.erase("around_common")
+	# VREAL-GRADIENT: the order is a jittered rank, and on fifteen to thirty
+	# houses one order band reads anywhere from -0.25 to -0.77. Where the kept
+	# plan is outside the band between the strongest real village
+	# (GRADIENT_RING) and the place check's rule (VillagePlaceCheck.
+	# GRADIENT_MAX), the same site is cut again with the next draw, up to
+	# GRADIENT_REDRAWS times, then once in the old order: the first inside the
+	# band that houses as many is kept, else the nearest. A site the ladder's
+	# last step cannot reproduce is left as it is.
+	if gradient_jitter > 0.0 and unplaced <= 0 and not spec.compact_display \
+			and spec.form not in [&"hillside", &"dispersed", &"crest"]:
+		var miss: float = _gradient_miss(out)
+		var redraw := 1
+		# the last try is the old order -- strict, the floor a filter -- which a
+		# five-house hamlet whose one big house will not fit near the common
+		# needs: no draw of so few houses keeps the small ones out past it
+		var kept_jitter: float = gradient_jitter
+		var kept_filter: bool = gradient_floor_filters
+		while miss > 0.0 and redraw <= GRADIENT_REDRAWS + 1 and not _search_spent():
+			_rank_variant = redraw
+			if redraw > GRADIENT_REDRAWS:
+				gradient_jitter = 0.0
+				gradient_floor_filters = true
+			var again: VillagePlan = _replan(spec, jobs, int(accepted[0]), float(accepted[1]),
+				minimum_depth, shore_depth, accepted_head)
+			var same_site: bool = again.site.is_equal_approx(out.site)
+			var again_left: int = cut_measured(again, jobs) if same_site else 0
+			_rank_variant = 0
+			gradient_jitter = kept_jitter
+			gradient_floor_filters = kept_filter
+			if not same_site:
+				break
+			redraw += 1
+			if again_left > unplaced or (bool(common_state["ready"]) and not bool(_round_common_state(again)["ready"])):
+				continue
+			var again_miss: float = _gradient_miss(again)
+			if again_miss < miss:
+				out = again
+				miss = again_miss
 	_trim_lanes(out)
 	# VTER-REAL-STREETNET: back streets round the rows, so the net has loops
 	_StreetNet.close(out)
@@ -535,6 +573,32 @@ const TURN_MIN_DEG := 16.0
 const TURN_SPREAD_DEG := 6.0
 ## Off for a probe that measures a plan without the turn.
 static var turn_enabled := true
+
+## VREAL-PACK: neighbours as close as real ones (docs/VILLAGE_REAL_LAYOUT.md).
+## In the historic survey 35 % of buildings stand within half a metre of a
+## neighbour (frankish 67 %, mediterranean 56 %, norse 24 %); the planner put
+## every house a full fire gap plus up to a metre of slide from the next, and
+## none touched. Two things change. A frontage may SNAP against a lot already
+## on its road edge (`_snap_spots`), so a neighbour stands at the rule, not up
+## to a metre past it. And a share of ordinary households JOIN a neighbour
+## (`_try_join`): eaves to eaves `JOIN_GAP` apart, their two lots split at one
+## shared side, the pair recorded on both lots as `party` and exempt from the
+## fire gap between them, and from half the frontage slack each. A household
+## asks while the village's buildings at a party side are fewer than the
+## culture's measured `touching` share (times `JOIN_SHARE_K`) of what is built
+## (`_joins`); many asks find no legal neighbour (a lot or a lane behind is in
+## the way), and the count simply keeps asking (docs/VILLAGE_REAL_LAYOUT.md).
+## Farms join too, toward the outside as they are sited. Flat ground only for
+## now: a lot on given ground carries terraces cut to its outline, which a
+## later split would leave reaching into its neighbour.
+const JOIN_CLASSES: Array[StringName] = [&"cottage", &"townhouse", &"shop", &"farm"]
+const JOIN_SHARE_K := 1.0
+static var join_share_k := JOIN_SHARE_K
+const JOIN_GAP := 0.1            ## eaves to eaves at a party side, metres
+const JOIN_REACH := 12.0         ## how much farther out than the best free spot a join may stand
+const JOIN_TRADES_NOT: Array[StringName] = [&"blacksmith", &"tavern", &"inn", &"stable", &"bakery"]
+## Off for a probe or a control that measures a plan without snapping or joining.
+static var pack_enabled := true
 
 
 ## One site attempt: the form's roads plus `lanes` extra ones, `scale` wider
@@ -716,6 +780,13 @@ static func measure_all(requests: Array[BuildingRequest]) -> Array[Dictionary]:
 static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 	if plan == null or plan.roads.is_empty():
 		return measured.size()
+	_body_reach = body_reach(measured)
+	var left: int = _cut_measured(plan, measured)
+	_body_reach = 0.0
+	return left
+
+
+static func _cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 	var jobs: Array[Dictionary] = []
 	for measured_job in _classified(plan.spec, measured):
 		# Placement measurements are reusable across site retries. Per-attempt
@@ -740,6 +811,12 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 	VillageDispersedForm.assign_jobs(plan, jobs)
 	VillageValleyForm.assign_jobs(plan, jobs)
 	VillageHillsideForm.assign_jobs(plan, jobs)
+	# the compact display (VillageSpec.compact(): a fixed 66 x 64 m grid other
+	# projects show many of) keeps the old order and floor -- its churchyard
+	# and common were measured on them (vcompact)
+	var jittered: bool = gradient_jitter > 0.0 and not plan.spec.compact_display
+	if jittered:
+		_rank_keys(plan.spec, jobs)
 	# The arrangement order (VILLAGES §6): the landmark and the lord first
 	# because they take their own lanes; then the trades that INSIST on where
 	# they stand -- the smithy on the through road at the downwind edge, the
@@ -751,6 +828,8 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 		if pa != pb:
 			return pa < pb
 		if pa == _ORDER_HOUSE:
+			if jittered:
+				return float(a["rank_key"]) < float(b["rank_key"])
 			var aa: float = _floor_area(a)
 			var ab: float = _floor_area(b)
 			if absf(aa - ab) > 0.01:
@@ -771,6 +850,7 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 	# and without the rule at all the correlation came out at -0.24, because a
 	# big house that would not fit near the common let every smaller one past.
 	var gradient_floor := 0.0
+	var house_ds: Array[float] = []
 	for job in jobs:
 		# a retry that runs past the wall-time budget stops placing: it can only
 		# lose to the plan already kept
@@ -880,7 +960,8 @@ static func cut_measured(plan: VillagePlan, measured: Array[Dictionary]) -> int:
 				plan.landmark_site = {"poly": actual["poly"], "front": actual["front"],
 					"kind": plan.landmark_site.get("kind", &"church")}
 			if _order_of(job) == _ORDER_HOUSE:
-				gradient_floor = maxf(gradient_floor, got)
+				house_ds.append(got)
+				gradient_floor = _gradient_floor(house_ds) if not plan.spec.compact_display else house_ds.max()
 	return jobs.size() - placed
 
 
@@ -900,6 +981,119 @@ const _ORDER_MONUMENT := 6
 
 ## How far inside an already-placed bigger house a smaller one may stand.
 const GRADIENT_SLACK := 6.0
+## VREAL-GRADIENT: what the floor is taken from, of the distances the bigger
+## households already stand at. `max` is the ratchet (no house nearer the
+## common than ANY bigger one, less the slack); `median` lets a smaller house
+## back into the gaps one displaced big house left behind; `none` is no floor.
+const GRADIENT_MODE := &"median"
+static var gradient_mode := GRADIENT_MODE
+## VREAL-GRADIENT: the households are handed over biggest first, each taking
+## the free frontage nearest the common, and that alone rings the green with
+## the big houses: Spearman -0.88 to -0.96 on the walk stops, where the
+## historic survey's villages read +0.06 (p10 -0.08, p90 +0.34; small ones
+## p10 -0.32). `gradient_jitter` blurs the order: each household's size rank
+## (0 the biggest, 1 the smallest) plus this many standard deviations of a
+## draw keyed on the seed and the household, so a middling house can go before
+## a big one. 0 is the strict order.
+const GRADIENT_JITTER := 0.35
+static var gradient_jitter := GRADIENT_JITTER
+## How closely the handing-over order follows size (Spearman, size rank against
+## order): 0.95 strict gives a ring, 0.5 no gradient worth the rule.
+const ORDER_RHO := Vector2(0.7, 0.85)
+const RANK_SALTS := 8
+## The strongest size-distance gradient of the survey's 46 historic villages
+## is Monteriggioni's -0.70: a plan past this is a ring no real village is.
+const GRADIENT_RING := -0.75
+const GRADIENT_REDRAWS := 4
+## Which redraw of the order `_rank_keys` is making (0 the first).
+static var _rank_variant := 0
+## The old floor, as a FILTER (only the frontages beyond it, whenever any
+## exist). Off; kept so `vreal` can show the old ring as its failing control.
+static var gradient_floor_filters := false
+
+
+## How far the plan's gradient -- VillagePlaceCheck's own measure: house
+## footprint against distance from the common, farms out -- stands outside
+## [GRADIENT_RING, the rule]; 0 inside, or when the rule does not apply.
+static func _gradient_miss(plan: VillagePlan) -> float:
+	var areas: Array = []
+	var dists: Array = []
+	var cc: Vector2 = VillageMeasure.common_centre(plan)
+	for i in plan.buildings_of_kind(&"house"):
+		var b: Dictionary = plan.buildings[i]
+		if b["class"] == &"farm":
+			continue
+		var fp: Rect2 = b["placement"]["footprint"]
+		areas.append(fp.size.x * fp.size.y)
+		dists.append(VillageMeasure.centre(VillageMeasure.footprint_poly(b)).distance_to(cc))
+	if areas.size() < 5:
+		return 0.0
+	var rho: float = VillageMeasure.spearman(areas, dists)
+	var top: float = VillagePlaceCheck.GRADIENT_MAX if areas.size() >= 8 else 0.0
+	if rho > top:
+		return rho - top
+	if rho < GRADIENT_RING:
+		return GRADIENT_RING - rho
+	return 0.0
+
+
+## Each household's place in the handing-over order (`rank_key`), see `gradient_jitter`.
+static func _rank_keys(spec: VillageSpec, jobs: Array[Dictionary]) -> void:
+	var houses: Array[Dictionary] = []
+	for job in jobs:
+		if _order_of(job) == _ORDER_HOUSE:
+			houses.append(job)
+	houses.sort_custom(func(a, b) -> bool:
+		var aa: float = _floor_area(a)
+		var ab: float = _floor_area(b)
+		if absf(aa - ab) > 0.01:
+			return aa > ab
+		return int(a["order"]) < int(b["order"]))
+	var n: int = houses.size()
+	# A free draw scatters widely on twenty houses (the walk stops read -0.38
+	# to -0.69 at 0.35). The order is what the gradient follows -- each
+	# household takes the free frontage nearest the common -- so the draw is
+	# kept only when the ORDER correlates with size inside ORDER_RHO, trying
+	# up to RANK_SALTS salts and else the one nearest the band's middle.
+	var best_keys: Array[float] = []
+	var best_miss := INF
+	for salt in RANK_SALTS:
+		var keys: Array[float] = []
+		for i in n:
+			var job: Dictionary = houses[i]
+			# a normal draw from two hashed uniforms (Box-Muller): a pure
+			# function of the spec, like every other choice this planner makes
+			var h1: int = absi(hash([spec.seed, int(job["order"]), salt, _rank_variant, "rank1"]))
+			var h2: int = absi(hash([spec.seed, int(job["order"]), salt, _rank_variant, "rank2"]))
+			var u1: float = (float(h1 % 100000) + 0.5) / 100000.0
+			var u2: float = float(h2 % 100000) / 100000.0
+			var z: float = sqrt(-2.0 * log(u1)) * cos(TAU * u2)
+			keys.append((float(i) / float(maxi(1, n - 1))) + gradient_jitter * z)
+		var ranks: Array = []
+		for i in n:
+			ranks.append(float(i))
+		var rho: float = VillageMeasure.spearman(ranks, keys) if n >= 3 else 1.0
+		var miss: float = 0.0 if rho >= ORDER_RHO.x and rho <= ORDER_RHO.y 			else absf(rho - (ORDER_RHO.x + ORDER_RHO.y) * 0.5)
+		if miss < best_miss:
+			best_miss = miss
+			best_keys = keys
+		if miss == 0.0:
+			break
+	for i in n:
+		houses[i]["rank_key"] = best_keys[i]
+
+
+static func _gradient_floor(ds: Array[float]) -> float:
+	if ds.is_empty():
+		return 0.0
+	match gradient_mode:
+		&"none":
+			return 0.0
+		&"median":
+			var sorted := ds.duplicate()
+			sorted.sort()
+			return float(sorted[sorted.size() / 2])
+	return ds.max()
 
 
 static func _order_of(job: Dictionary) -> int:
@@ -999,6 +1193,10 @@ static func measure(request: BuildingRequest) -> Dictionary:
 ## §5's lot classes, from the request the programmer made. A farmer's house
 ## is a farm (a yard, a big fire gap, out on a lane); a `townhouse`-styled
 ## house and every shop are town lots; everything else domestic is a cottage.
+## A farmer in a COTTAGE is a smallholder (VREAL-TYPES): his strips are in the
+## open field like everyone's, his house stands in the village on a cottage
+## lot. Sending every farmer's household to the site's edge is what emptied
+## the middle of a farming village (docs/VILLAGE_REAL_LAYOUT.md).
 static func lot_class(request: BuildingRequest) -> StringName:
 	match request.kind:
 		&"church", &"temple":
@@ -1008,7 +1206,7 @@ static func lot_class(request: BuildingRequest) -> StringName:
 		&"shop":
 			return &"shop"
 		&"house":
-			if request.purpose == &"farmer":
+			if request.purpose == &"farmer" and request.style not in [&"cottage", &"thatch_cottage"]:
 				return &"farm"
 			if request.style == &"townhouse":
 				return &"townhouse"
@@ -1276,6 +1474,8 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 	var all: Array = []
 	for r in roads:
 		all.append_array(_spots(ctx, r, cc, gates, plan.site, site))
+	if pack_enabled and not plan.spec.compact_display and not bool(job.get("piles", false)):
+		all.append_array(_snap_spots(plan, ctx, job, roads, cc, gates, site, frontage, depth, setback, gap))
 	var ordered: Array = all
 	if job.has("near_point"):
 		var near_point: Vector2 = job["near_point"]
@@ -1336,15 +1536,27 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 			else:
 				inside.append(spot)
 		ordered = inside + arms
+	# The first legal frontage is chosen, then committed below -- unless this
+	# household joins a neighbour nearly as well placed (VREAL-PACK).
+	var chosen: Dictionary = {}
+	var chosen_d := -1.0
+	var chosen_key := INF
 	for spots in [ordered]:
 		# the gradient floor: no household nearer the common than a bigger one
+		# -- as an ORDER (VREAL-GRADIENT): the frontages beyond the floor first,
+		# then the rest. As a filter it dropped every inner spot whenever any
+		# outer one existed, legal or not, and a strand smith with forty legal
+		# frontages inside the floor went unhoused (walk stop 3).
 		if floor_d > 0.0:
 			var far: Array = []
+			var near: Array = []
 			for spot in spots:
 				if float(spot["d"]) >= floor_d - GRADIENT_SLACK:
 					far.append(spot)
-			if not far.is_empty():
-				spots = far
+				else:
+					near.append(spot)
+			var filters: bool = gradient_floor_filters or plan.spec.compact_display
+			spots = far if filters and not far.is_empty() else far + near
 		# On given ground (VTER-LOTS) a lot whose front door stands high over
 		# its graded ground -- the house set front-downhill -- is kept only
 		# until the search ends: any lot with its door nearer the ground wins,
@@ -1371,19 +1583,35 @@ static func _place_on_road(plan: VillagePlan, ctx: Dictionary, job: Dictionary,
 				lot = _turned(plan, ctx, spot, lot, frontage, lot_depth, setback, job, rule, gap)
 				if _door_rise(lot) > VillageLotGround.DOOR_RISE_PREFERRED and not bool(job.get("door_ok", false)):
 					if high_door.is_empty():
-						high_door = {"lot": lot, "d": float(spot["d"]), "mid": spot["mid"]}
+						high_door = {"lot": lot, "d": float(spot["d"]), "mid": spot["mid"],
+							"key": _site_key(site, spot)}
 					break
 				# the turn is local -- across the road, or a few lots along it --
 				# never a move away from where the village wanted this house
 				if not high_door.is_empty() and Vector2(spot["mid"]).distance_to(high_door["mid"]) > DOOR_TURN_REACH:
-					_commit(plan, high_door["lot"], job, rule)
-					return float(high_door["d"])
-				_commit(plan, lot, job, rule)
-				return float(spot["d"])
-		if not high_door.is_empty():
-			_commit(plan, high_door["lot"], job, rule)
-			return float(high_door["d"])
-	return -1.0
+					chosen = high_door["lot"]
+					chosen_d = float(high_door["d"])
+					chosen_key = float(high_door["key"])
+				else:
+					chosen = lot
+					chosen_d = float(spot["d"])
+					chosen_key = _site_key(site, spot)
+				break
+			if not chosen.is_empty():
+				break
+		if chosen.is_empty() and not high_door.is_empty():
+			chosen = high_door["lot"]
+			chosen_d = float(high_door["d"])
+			chosen_key = float(high_door["key"])
+	if _joins(plan, job):
+		var joined: Dictionary = _try_join(plan, ctx, job, roads, cc, gates, gap, depth, setback,
+			chosen_key + JOIN_REACH if not chosen.is_empty() else INF, floor_d, site)
+		if not joined.is_empty():
+			return float(joined["d"])
+	if chosen.is_empty():
+		return -1.0
+	_commit(plan, chosen, job, rule)
+	return chosen_d
 
 
 ## How far along the road a house set front-downhill may move to turn its
@@ -1539,6 +1767,314 @@ static func _spots(ctx: Dictionary, r: int, cc: Vector2, gates: Array[Vector2],
 	return _sorted(spots, site)
 
 
+## One candidate frontage at `m` along edge `e`, with the distances the sorts read.
+static func _spot_at(e: Dictionary, m: float, cc: Vector2, gates: Array[Vector2], ground: Rect2) -> Dictionary:
+	var origin: Vector2 = e["a"] if float(e["side"]) > 0.0 else e["b"]
+	var mid: Vector2 = origin + (e["dir"] as Vector2) * m
+	var to_gate := INF
+	for g in gates:
+		to_gate = minf(to_gate, mid.distance_to(g))
+	return {"e": e, "m": m, "mid": mid, "d": mid.distance_to(cc), "gate": to_gate,
+		"edge": _to_edge(ground, mid), "snap": true}
+
+
+## The number a siting sorts its frontages by (`_sorted`), smaller first:
+## distance to the common, to a gate, or to the site's edge.
+static func _site_key(site: Dictionary, spot: Dictionary) -> float:
+	match StringName(site.get("toward", &"common")):
+		&"gate":
+			return float(spot["gate"])
+		&"outside":
+			return float(spot["edge"])
+		&"edge":
+			return -float(spot["d"])
+	return float(spot["d"])
+
+
+## True when `lot`'s front lies on edge `e`'s line, on the same side of the road.
+static func _collinear(lot: Dictionary, e: Dictionary) -> bool:
+	var n: Vector2 = e["normal"]
+	if (lot["normal"] as Vector2).dot(n) < 0.999:
+		return false
+	var front: PackedVector2Array = lot["front"]
+	return absf((front[0] - (e["a"] as Vector2)).dot(n)) <= COLLINEAR_EPS \
+		and absf((front[1] - (e["a"] as Vector2)).dot(n)) <= COLLINEAR_EPS
+
+
+## The interval `points` cover along `dir`, measured from `origin`.
+static func _span(points: PackedVector2Array, origin: Vector2, dir: Vector2) -> Vector2:
+	var lo := INF
+	var hi := -INF
+	for p in points:
+		var t: float = (p - origin).dot(dir)
+		lo = minf(lo, t)
+		hi = maxf(hi, t)
+	return Vector2(lo, hi)
+
+
+## Where this job's eaves would reach either side of a lot's midpoint on edge
+## `e`, along the edge: (behind, ahead), the first negative.
+static func _eaves_extent(e: Dictionary, job: Dictionary, frontage: float, depth: float,
+		setback: float) -> Vector2:
+	var origin: Vector2 = e["a"] if float(e["side"]) > 0.0 else e["b"]
+	var trial := _make_lot(e, 0.0, frontage, depth, setback)
+	return _span(Placement.world_rect(job["placement"], _transform_for(trial, job), false),
+		origin, e["dir"])
+
+
+## VREAL-PACK: the frontages that stand exactly against a building already on
+## this road edge -- against its lot's side, and with the eaves at the fire
+## gap -- which the one-metre slide only ever reached by luck.
+static func _snap_spots(plan: VillagePlan, ctx: Dictionary, job: Dictionary, roads: Array,
+		cc: Vector2, gates: Array[Vector2], site: Dictionary, frontage: float, depth: float,
+		setback: float, gap: float) -> Array:
+	var out: Array = []
+	if plan.buildings.is_empty():
+		return out
+	var by_road := {}
+	for k in plan.buildings.size():
+		var li := int(plan.buildings[k].get("lot", -1))
+		if li < 0 or li >= plan.lots.size():
+			continue
+		var r := int(plan.lots[li]["road"])
+		if r not in roads:
+			continue
+		if not by_road.has(r):
+			by_road[r] = []
+		by_road[r].append(k)
+	var side: StringName = site.get("side", &"")
+	var want_x: float = 1.0 if side == &"east" else -1.0
+	for e in ctx["edges"]:
+		var r := int(e["road"])
+		if not by_road.has(r):
+			continue
+		var origin: Vector2 = e["a"] if float(e["side"]) > 0.0 else e["b"]
+		var dir: Vector2 = e["dir"]
+		var run: float = float(e["length"])
+		var ext := Vector2.INF
+		for k in by_road[r]:
+			var b: Dictionary = plan.buildings[k]
+			var lot: Dictionary = plan.lots[int(b["lot"])]
+			if not _collinear(lot, e):
+				continue
+			if ext == Vector2.INF:
+				ext = _eaves_extent(e, job, frontage, depth, setback)
+			var lot_span := _span(lot["front"], origin, dir)
+			var eaves := _span(Placement.world_rect(b["placement"], b["transform"], false), origin, dir)
+			var want: float = maxf(gap, fire_gap(b["class"], plan.spec, b["placement"])) + 0.01
+			for m in [lot_span.y + frontage * 0.5, lot_span.x - frontage * 0.5,
+					eaves.y + want - ext.x, eaves.x - want - ext.y]:
+				if m < 0.0 or m > run:
+					continue
+				var spot := _spot_at(e, m, cc, gates, plan.site)
+				if side != &"" and (float(spot["mid"].x) - cc.x) * want_x < 0.0:
+					continue
+				out.append(spot)
+	return out
+
+
+## True when this household asks to join a neighbour (VREAL-PACK): an ordinary
+## house, shop or farm sited toward the common or the outside, on flat ground,
+## while the village is short of the culture's measured touching share.
+static func _joins(plan: VillagePlan, job: Dictionary) -> bool:
+	if not pack_enabled or plan.spec.compact_display or plan.ground != null \
+			or not plan.island.is_empty() or plan.spec.form == &"water":
+		return false
+	if job["class"] not in JOIN_CLASSES or bool(job.get("piles", false)) \
+			or job.has("near_point") or job.has("hamlet"):
+		return false
+	var req: BuildingRequest = job["request"]
+	if req.kind == &"shop" and req.purpose in JOIN_TRADES_NOT:
+		return false
+	# a farm joins toward the outside, as it is sited (a nucleated village's
+	# farmsteads stand in rows: Frankish and Mediterranean sites touch at 67 %
+	# and 56 %); the trades that answer to a gate or the edge do not join
+	if StringName(job.get("siting", SITING_DEFAULT).get("toward", &"common")) not in [&"common", &"outside"]:
+		return false
+	# a running count, not a per-household draw: ask while the buildings
+	# standing at a party side are fewer than the culture's real share of
+	# what will be built once this one is. A draw cannot tell a village whose
+	# asks keep failing (a snapped row has no free side) from one whose every
+	# ask succeeds: Frankish stayed at 0.22 asking nearly always, Norse ran
+	# over its band once farms could join.
+	var target: float = float(VillageRealLayout.of(plan.spec.effective_culture())["touching"]) * join_share_k
+	var party := 0
+	for lot in plan.lots:
+		if not (lot.get("party", []) as Array).is_empty():
+			party += 1
+	return float(party) < target * float(plan.buildings.size() + 1)
+
+
+## A building a joiner may stand against: an ordinary house, shop or farm on a lot
+## that was neither turned, fanned, terraced nor trimmed by water (a sliver cut
+## off a front corner is fine: `_trim_side` cuts a half-plane).
+static func _party_partner(plan: VillagePlan, b: Dictionary, lot: Dictionary) -> bool:
+	if b["class"] not in JOIN_CLASSES or bool(lot.get("landmark", false)) \
+			or lot.has("yaw_deg") or lot.has("ground_fit") or lot.has("piles") or lot.has("mill_race"):
+		return false
+	var other: BuildingRequest = b["request"]
+	if other.kind == &"shop" and other.purpose in JOIN_TRADES_NOT:
+		return false
+	if plan.spec.form == &"round" and plan.roads[int(lot["road"])]["class"] == &"street":
+		return false
+	return (lot["poly"] as PackedVector2Array).size() >= 4
+
+
+## Place this job against a neighbour (VREAL-PACK), in its siting's order
+## (beyond the gradient floor before inside it), no worse by that order than
+## `key_max`: the eaves `JOIN_GAP` from the
+## neighbour's, the neighbour's lot cut back to one shared side halfway
+## between, this lot running from that side to the eaves plus half a fire gap
+## on the free side. Returns {"d"} when placed, {} when no join was legal.
+static func _try_join(plan: VillagePlan, ctx: Dictionary, job: Dictionary, roads: Array,
+		cc: Vector2, gates: Array[Vector2], gap: float, depth: float, setback: float,
+		key_max: float, floor_d: float, site: Dictionary) -> Dictionary:
+	var margin: float = maxf(gap, frontage_slack(plan.spec)) * 0.5
+	var half: float = float(job["half_w"])
+	var cands: Array = []
+	for k in plan.buildings.size():
+		var b: Dictionary = plan.buildings[k]
+		var li := int(b.get("lot", -1))
+		if li < 0 or li >= plan.lots.size():
+			continue
+		var lot: Dictionary = plan.lots[li]
+		var r := int(lot["road"])
+		if r not in roads or not _party_partner(plan, b, lot):
+			continue
+		var eaves_world: PackedVector2Array = Placement.world_rect(b["placement"], b["transform"], false)
+		for e in ctx["edges"]:
+			if int(e["road"]) != r or not _collinear(lot, e):
+				continue
+			var origin: Vector2 = e["a"] if float(e["side"]) > 0.0 else e["b"]
+			var dir: Vector2 = e["dir"]
+			var ext := _eaves_extent(e, job, 2.0 * half, depth, setback)
+			var eaves := _span(eaves_world, origin, dir)
+			var lot_span := _span(lot["front"], origin, dir)
+			for ahead in [true, false]:
+				var m: float = eaves.y + JOIN_GAP - ext.x if ahead else eaves.x - JOIN_GAP - ext.y
+				var shared: float = eaves.y + JOIN_GAP * 0.5 if ahead else eaves.x - JOIN_GAP * 0.5
+				var free: float = m + ext.y + margin if ahead else m + ext.x - margin
+				# the neighbour's lot only ever shrinks to the shared side
+				if (ahead and shared > lot_span.y + 0.001) or (not ahead and shared < lot_span.x - 0.001):
+					continue
+				if m < 0.0 or m > float(e["length"]):
+					continue
+				var spot := _spot_at(e, m, cc, gates, plan.site)
+				var key: float = _site_key(site, spot)
+				if key > key_max:
+					continue
+				var d: float = float(spot["d"])
+				cands.append({"k": k, "li": li, "e": e, "m": m, "shared": shared, "free": free,
+					"ahead": ahead, "d": d, "key": key, "origin": origin,
+					"inner": floor_d > 0.0 and d < floor_d - GRADIENT_SLACK})
+	# in the siting's own order, and the gradient floor as an order, as for any
+	# frontage: beyond it first
+	cands.sort_custom(func(a, b) -> bool:
+		if bool(a["inner"]) != bool(b["inner"]):
+			return not bool(a["inner"])
+		return float(a["key"]) < float(b["key"]))
+	var rule: Dictionary = lot_rule(job["class"], plan.spec)
+	for c in cands:
+		var e: Dictionary = c["e"]
+		var dir: Vector2 = e["dir"]
+		var n: Vector2 = e["normal"]
+		var origin: Vector2 = c["origin"]
+		var lo_t: float = minf(float(c["shared"]), float(c["free"]))
+		var hi_t: float = maxf(float(c["shared"]), float(c["free"]))
+		var a: Vector2 = origin + dir * lo_t
+		var b2: Vector2 = origin + dir * hi_t
+		var lot := {
+			"poly": PackedVector2Array([a, b2, b2 + n * depth, a + n * depth]),
+			"front": PackedVector2Array([a, b2]),
+			"road": int(e["road"]),
+			"normal": n,
+			"setback": setback,
+			"landmark": false,
+			"shift": float(c["m"]) - (lo_t + hi_t) * 0.5,
+			"party_with": int(c["k"]),
+		}
+		var partner: Dictionary = plan.lots[int(c["li"])]
+		var was_poly: PackedVector2Array = partner["poly"]
+		var was_front: PackedVector2Array = partner["front"]
+		var trimmed := _trim_side(partner, float(c["shared"]), bool(c["ahead"]), origin, dir)
+		if trimmed.is_empty() or not _front_seated(ctx, lot["front"], int(e["road"])) \
+				or not _front_seated(ctx, trimmed["front"], int(partner["road"])):
+			continue
+		partner["poly"] = trimmed["poly"]
+		partner["front"] = trimmed["front"]
+		if not _lot_is_legal(plan, ctx, lot, job, gap):
+			partner["poly"] = was_poly
+			partner["front"] = was_front
+			continue
+		partner["shift"] = float(partner.get("shift", 0.0)) + float(trimmed["shift"])
+		lot.erase("party_with")
+		lot["party"] = [int(c["li"])]
+		_commit(plan, lot, job, rule)
+		var sides: Array = partner.get("party", [])
+		sides.append(plan.lots.size() - 1)
+		partner["party"] = sides
+		return {"d": float(c["d"])}
+	return {}
+
+
+## `lot` with its side ahead (or behind) along `dir` moved to `t` from
+## `origin`, and how far that moved its front's midpoint back along `dir`
+## (the building's offset from it grows by as much).
+static func _trim_side(lot: Dictionary, t: float, ahead: bool, origin: Vector2, dir: Vector2) -> Dictionary:
+	var front: PackedVector2Array = (lot["front"] as PackedVector2Array).duplicate()
+	var i_front: int = 1 if ahead else 0
+	var delta: float = t - (front[i_front] - origin).dot(dir)
+	front[i_front] += dir * delta
+	# cut the half-plane beyond `t` off the lot: a lot with a sliver trimmed off
+	# its front corner (`_trim_slivers`) has more than four corners
+	var n := Vector2(-dir.y, dir.x)
+	var base: Vector2 = origin + dir * t
+	var away: Vector2 = dir if ahead else -dir
+	var far := 10000.0
+	var beyond := PackedVector2Array([base + n * far, base + n * far + away * far,
+		base - n * far + away * far, base - n * far])
+	var cut: Array[PackedVector2Array] = Geometry2D.clip_polygons(lot["poly"], beyond)
+	if cut.size() != 1:
+		return {}
+	return {"poly": cut[0], "front": front, "shift": -delta * 0.5}
+
+
+## True when `front` lies on an edge line of road `road` (within §5's
+## collinearity) with its middle over that edge's segment: what the lot suite
+## asks of every frontage. A lot split at a party side runs from the shared
+## side to its free side, and a trimmed neighbour's front shrinks from one
+## end, so either middle can leave its segment.
+static func _front_seated(ctx: Dictionary, front: PackedVector2Array, road: int) -> bool:
+	for e in ctx["edges"]:
+		if int(e["road"]) != road:
+			continue
+		if distance_to_edge_line(e, front[0]) > COLLINEAR_EPS or distance_to_edge_line(e, front[1]) > COLLINEAR_EPS:
+			continue
+		var a: Vector2 = e["a"]
+		var unit: Vector2 = ((e["b"] as Vector2) - a).normalized()
+		var mid: float = ((front[0] + front[1]) * 0.5 - a).dot(unit)
+		if mid >= -COLLINEAR_EPS and mid <= float(e["length"]) + COLLINEAR_EPS:
+			return true
+	return false
+
+
+## True when buildings `i` and `j` share a party side (VREAL-PACK): the fire
+## gap between them is waived, and they may stand eaves to eaves.
+static func party_pair(plan: VillagePlan, i: int, j: int) -> bool:
+	var li := int(plan.buildings[i].get("lot", -1))
+	var lj := int(plan.buildings[j].get("lot", -1))
+	if li < 0 or lj < 0 or li >= plan.lots.size() or lj >= plan.lots.size():
+		return false
+	return lj in (plan.lots[li].get("party", []) as Array) or li in (plan.lots[lj].get("party", []) as Array)
+
+
+## The frontage a lot needs beyond its building: the slack, less half of it
+## for each party side (VREAL-PACK), where the neighbour's eaves stand instead.
+static func frontage_need(spec: VillageSpec, lot: Dictionary) -> float:
+	var sides: int = mini(2, (lot.get("party", []) as Array).size())
+	return frontage_slack(spec) * (1.0 - 0.5 * float(sides))
+
+
 ## Order a list of candidate frontages the way this siting wants them tried.
 ## Pulled out of _spots so the same order can be applied across roads.
 static func _sorted(spots: Array, site: Dictionary) -> Array:
@@ -1546,7 +2082,15 @@ static func _sorted(spots: Array, site: Dictionary) -> Array:
 		&"gate":
 			spots.sort_custom(func(a, b) -> bool: return float(a["gate"]) < float(b["gate"]))
 		&"edge":
-			spots.sort_custom(func(a, b) -> bool: return float(a["d"]) > float(b["d"]))
+			# the edge of the BODY, not of the site (VREAL-BODY): farthest first
+			# inside the body's reach, then the nearest beyond it
+			var reach: float = _body_reach if _body_reach > 0.0 else INF
+			spots.sort_custom(func(a, b) -> bool:
+				var da: float = float(a["d"])
+				var db: float = float(b["d"])
+				if (da <= reach) != (db <= reach):
+					return da <= reach
+				return da > db if da <= reach else da < db)
 		&"outside":
 			spots.sort_custom(func(a, b) -> bool: return float(a["edge"]) < float(b["edge"]))
 		_:
@@ -1562,21 +2106,48 @@ static func _to_edge(ground: Rect2, p: Vector2) -> float:
 		minf(p.y - ground.position.y, ground.end.y - p.y))
 
 
-## Where the village is entered: its gate crossings, or, with no enclosure,
-## the two ends of the through road. The same definition VillageMeasure uses,
-## so the planner is steering by the number the check will measure.
+## Where the village is entered: its gate crossings, or, before there are any
+## (an open village, or a wall not yet drawn round what is built), where the
+## through road will enter the built body (VREAL-BODY): the points on it
+## `_body_reach` from the common, the body's expected radius. The check reads
+## the same thing from the finished plan (VillageMeasure.entrances). With no
+## reach set, the two ends of the through road, as before.
 static func _gates(plan: VillagePlan) -> Array[Vector2]:
 	var out: Array[Vector2] = []
 	for g in plan.gate_crossings:
 		out.append(g["pos"])
 	if not out.is_empty():
 		return out
+	var cc: Vector2 = VillageMeasure.common_centre(plan)
 	for r in plan.roads_of_class(&"through"):
 		var pts: PackedVector2Array = plan.roads[r]["points"]
-		if pts.size() >= 2:
+		if pts.size() < 2:
+			continue
+		if _body_reach > 0.0:
+			var reach: float = _body_reach
+			out.append_array(VillageMeasure.road_entrances(pts, cc,
+				func(p: Vector2) -> bool: return p.distance_to(cc) <= reach))
+		else:
 			out.append(pts[0])
 			out.append(pts[pts.size() - 1])
 	return out
+
+
+## The body's expected radius about the common (VREAL-BODY): the ground its
+## buildings would cover at BODY_COVERAGE, as a disc. Real small villages
+## cover a third of their hull (median 0.34, <= 80 buildings); this planner's
+## roads, common and churchyard take more, hence the lower share. Set by
+## cut_measured for the gate and edge siting, 0 when no search runs.
+const BODY_COVERAGE := 0.2
+const BODY_REACH_MIN := 30.0
+static var _body_reach := 0.0
+
+static func body_reach(jobs: Array[Dictionary]) -> float:
+	var built := 0.0
+	for job in jobs:
+		var r: Rect2 = job["bounds_rect"]
+		built += r.size.x * r.size.y
+	return maxf(BODY_REACH_MIN, sqrt(built / (PI * BODY_COVERAGE)))
 
 
 ## The lot whose front edge is CENTRED `m` metres along the road edge `e`.
@@ -1681,6 +2252,8 @@ static func _lot_is_legal(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 			if dry.size() != 1:
 				return false
 			poly = dry[0]
+	if not plan.spec.compact_display:
+		poly = _trim_slivers(ctx, poly)
 	var candidate_lot: Dictionary = lot.duplicate()
 	candidate_lot["poly"] = poly
 	if not _site_clear(plan, ctx, candidate_lot, poly):
@@ -1705,7 +2278,7 @@ static func _lot_is_legal(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 	if not _purpose_clear(plan, candidate_lot, job, poly, mine, xf):
 		return false
 	var req: BuildingRequest = job["request"]
-	if not _neighbours_clear(plan, job, mine, xf, gap):
+	if not _neighbours_clear(plan, job, mine, xf, gap, int(lot.get("party_with", -1))):
 		return false
 	var mill_race: Dictionary = {}
 	if req.kind == &"shop" and req.purpose == &"bakery" and _mill_water(plan):
@@ -1725,6 +2298,29 @@ static func _lot_is_legal(plan: VillagePlan, ctx: Dictionary, lot: Dictionary,
 	if not mill_race.is_empty():
 		lot["mill_race"] = mill_race
 	return true
+
+
+## A lot is a rectangle on one road segment, but its frontage may overhang the
+## segment's ends (`_make_lot`). On the inside of a bend the next segment's
+## ribbon then crosses the overhanging front corner by a centimetre or so:
+## a sliver of a few tenths of a square metre, and a refusal. The 18.6 m
+## frontage of a Norse longhall on the strand was refused along the whole
+## gently bowed middle of its road for exactly this (VREAL-PACK, walk stop 3).
+## A sliver under `SLIVER_M2` is cut off the lot instead -- the lot still
+## does not overlap the road, and its front still lies on the road's edge
+## within §5's collinearity.
+const SLIVER_M2 := 0.5
+
+
+static func _trim_slivers(ctx: Dictionary, poly: PackedVector2Array) -> PackedVector2Array:
+	for ribbon in ctx["ribbons"]:
+		var area: float = overlap_area(poly, ribbon)
+		if area <= AREA_EPS or area >= SLIVER_M2:
+			continue
+		var cut: Array[PackedVector2Array] = Geometry2D.clip_polygons(poly, ribbon)
+		if cut.size() == 1 and Poly.area(cut[0]) >= Poly.area(poly) - SLIVER_M2:
+			poly = cut[0]
+	return poly
 
 
 ## On given ground (VTER-SITING) a lot stands on DRY ground and does not
@@ -1896,7 +2492,7 @@ static func _lane_reaches_entrance(plan: VillagePlan, lot: Dictionary,
 static func _purpose_clear(plan: VillagePlan, lot: Dictionary, job: Dictionary,
 		poly: PackedVector2Array, mine: PackedVector2Array, xf: Transform3D) -> bool:
 	var req: BuildingRequest = job["request"]
-	if req.kind == &"house" and req.purpose == &"farmer":
+	if req.kind == &"house" and job["class"] == &"farm":
 		# Measure the transformed walls, not the road frontage.
 		var farm_centre := Poly.bounding_rect(Placement.world_rect(job["placement"], xf, true)).get_center()
 		var reach: float = farm_reach(plan.spec.form, minf(plan.site.size.x, plan.site.size.y))
@@ -1923,8 +2519,10 @@ static func _purpose_clear(plan: VillagePlan, lot: Dictionary, job: Dictionary,
 
 
 ## Keep fire, noise, and opposing entrances clear of placed buildings.
+## `party` is the building this one joins (VREAL-PACK): no fire gap between
+## the two, only eaves that do not meet.
 static func _neighbours_clear(plan: VillagePlan, job: Dictionary,
-		mine: PackedVector2Array, xf: Transform3D, gap: float) -> bool:
+		mine: PackedVector2Array, xf: Transform3D, gap: float, party := -1) -> bool:
 	var req: BuildingRequest = job["request"]
 	var loud: bool = req.kind == &"shop" and req.purpose == &"blacksmith"
 	var quiet: bool = req.kind in [&"church", &"temple"] or (req.kind == &"shop" and req.purpose == &"tavern")
@@ -1932,10 +2530,13 @@ static func _neighbours_clear(plan: VillagePlan, job: Dictionary,
 	var my_foot := Placement.world_rect(job["placement"], xf, true)
 	var my_front := VillageMeasure.front_mid(candidate)
 	var my_direction := VillageMeasure.front_dir(candidate)
-	for b in plan.buildings:
+	for bi in plan.buildings.size():
+		var b: Dictionary = plan.buildings[bi]
 		var theirs: PackedVector2Array = Placement.world_rect(
 			b["placement"], b["transform"], false)
 		var want: float = maxf(gap, fire_gap(b["class"], plan.spec, b["placement"]))
+		if bi == party:
+			want = JOIN_GAP * 0.5
 		var other: BuildingRequest = b["request"]
 		var other_loud: bool = other.kind == &"shop" and other.purpose == &"blacksmith"
 		var other_quiet: bool = other.kind in [&"church", &"temple"] \
@@ -2031,6 +2632,10 @@ static func _transform_for(lot: Dictionary, job: Dictionary) -> Transform3D:
 	var basis := Basis(Vector3.UP, yaw)
 	var front: PackedVector2Array = lot["front"]
 	var mid: Vector2 = (front[0] + front[1]) * 0.5
+	# a lot split at a party side (VREAL-PACK) is no longer centred on its
+	# building: `shift` is the building's offset along the front from its middle
+	if lot.has("shift"):
+		mid += (front[1] - front[0]).normalized() * float(lot["shift"])
 	var target: Vector2 = mid + n * setback
 	var fp: Rect2 = job["footprint"]
 	var local := Vector3(fp.position.x + fp.size.x * 0.5, 0.0, fp.position.y)
@@ -2064,6 +2669,10 @@ static func _commit(plan: VillagePlan, lot: Dictionary, job: Dictionary, _rule: 
 	}
 	if lot.has("yaw_deg"):
 		record["yaw_deg"] = float(lot["yaw_deg"])
+	if lot.has("shift"):
+		record["shift"] = float(lot["shift"])
+	if lot.has("party"):
+		record["party"] = (lot["party"] as Array).duplicate()
 	var request: BuildingRequest = job["request"]
 	if lot.has("ground_fit"):
 		# VTER-LOTS: the lot's platform, its fall and the walls that hold it,

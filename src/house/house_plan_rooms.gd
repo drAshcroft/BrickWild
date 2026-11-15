@@ -338,9 +338,15 @@ static func _domestic_kinds(spec: HouseSpec, wanted: int) -> Array[StringName]:
 	var source: Array[StringName] = []
 	var programme: Array = spec.program if not spec.program.is_empty() \
 		else HouseSpec.STYLES.get(spec.style, {}).get("domestic_program", HouseSpec.PROGRAM)
+	var living_hall := living_hall_grammar(spec)
 	for value in programme:
 		var kind := StringName(value)
 		if kind == &"hall":
+			continue
+		# HOME-HEARTH: the household cooks, eats and sits round the one fire in
+		# the hall; the kitchen activity is merged there (kitchen_merged), not
+		# given a room of its own with the fire and nobody at it.
+		if living_hall and kind == &"kitchen":
 			continue
 		if kind != &"bedroom" and source.has(kind):
 			continue
@@ -370,6 +376,30 @@ static func _domestic_kinds(spec: HouseSpec, wanted: int) -> Array[StringName]:
 	while ordered.size() < wanted:
 		ordered.append(&"store")
 	return ordered
+
+
+## Styles whose pre-modern house lives round the fire in its hall (GUIDES H1,
+## H5, H8 and 5b: in the provinces the hall was the kitchen until c.1700; a
+## separate kitchen belonged to big houses). Townhouses keep the shop-house
+## kitchen behind the shop, rich houses their service range.
+const LIVING_HALL_STYLES: Array[StringName] = [&"cottage", &"thatch_cottage", &"farmhouse"]
+
+
+## HOME-HEARTH: does this house cook in its hall? An ordinary, no-trade house
+## of a living-hall style built before HouseSpec.LIVING_HALL_BEFORE. Read from
+## the spec's period, never drawn. (HouseGenerator always copies the style's
+## programme into spec.program, so the programme names the kitchen either way.)
+## A trade house keeps its kitchen for now: it is planned from the generic
+## programme on the partition path, whose small front hall cannot also cook and
+## seat the household (stair sweep seeds 72001/72009/72013/72021, 14 Nov). So
+## does a house of more than one storey: its hall also carries the stair, and
+## fire, cooking corner, stair and table did not fit together (cottage
+## 2-storey seed 32101; farmhouse seed 7 two storeys, 14 Nov).
+static func living_hall_grammar(spec: HouseSpec) -> bool:
+	return spec != null and spec.get_script() == BASE_HOUSE_SPEC \
+		and spec.trade == &"none" and spec.storeys <= 1 \
+		and LIVING_HALL_STYLES.has(spec.style) \
+		and spec.period < HouseSpec.LIVING_HALL_BEFORE
 
 
 ## Ordinary, no-trade domestic plans may merge cooking into the hall when
@@ -1049,6 +1079,16 @@ static func name_rooms(p: HousePlan, spec: HouseSpec) -> void:
 	if hall < 0:
 		hall = _largest(p)
 	p.rooms[hall]["kind"] = &"hall"
+	var living_hall := living_hall_grammar(spec)
+	if living_hall:
+		# HOME-HEARTH on the partition path: the hall is the living hall that
+		# cooks, as the planned domestic grammar marks it (refresh_domestic_
+		# metadata only runs for planned layouts).
+		p.rooms[hall]["domestic_role"] = &"living_hall"
+		p.rooms[hall]["domestic_functions"] = [&"entry", &"circulation", &"dining",
+			&"common_living", &"cooking"]
+		p.rooms[hall]["shared_cooking"] = true
+		p.rooms[hall]["meal_room"] = true
 
 	# the rest of the program, most public first, over the remaining rooms
 	# ordered from the door backwards
@@ -1056,6 +1096,9 @@ static func name_rooms(p: HousePlan, spec: HouseSpec) -> void:
 	var deferred: Array[StringName] = []
 	for kind in spec.program:
 		if kind == &"hall":
+			continue
+		# HOME-HEARTH: cooking stays in the hall, by the household's fire.
+		if living_hall and kind == &"kitchen":
 			continue
 		# A house with an upstairs sleeps upstairs. The ground floor keeps the
 		# public and service programme -- hall, kitchen, parlour, workshop,

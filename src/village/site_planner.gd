@@ -798,9 +798,28 @@ static func _plan_round(out: VillagePlan, spec: VillageSpec,
 ## A strand's single row stands between its inland road and the shore.
 ## The measured row depth leaves the full native houses and a working bank
 ## on dry ground; a mill can reach water from its rear without crossing a road.
+## A strand's road follows a straight shore (the coast here is a rectangle), so
+## its bow is held to `STRAND_BOW_MAX`, still more than MIN_BOW_M. The bend
+## grows with the road's length: on stop 3 of the walk (VREAL-PACK), a 315 m
+## strand bowed so far that a longhall's 18.6 m lot, overhanging its 10 m road
+## segment, cut the carriageway with its front corners everywhere but the
+## straight east end -- five of eleven households found no frontage, and each
+## retry stretched the site and bowed the road further.
+const STRAND_BOW_MAX := 3.0
+
+
 static func _plan_strand(out: VillagePlan, spec: VillageSpec,
 		through: PackedVector2Array, measured_depth := 0.0) -> void:
 	var site: Rect2 = out.site
+	var bowed: float = bow(through)
+	if bowed > STRAND_BOW_MAX and through.size() >= 2:
+		var a: Vector2 = through[0]
+		var b: Vector2 = through[through.size() - 1]
+		var squeeze: float = STRAND_BOW_MAX / bowed
+		through = through.duplicate()
+		for i in range(through.size()):
+			var on_chord: float = lerpf(a.y, b.y, (through[i].x - a.x) / maxf(0.001, b.x - a.x))
+			through[i].y = on_chord + (through[i].y - on_chord) * squeeze
 	var shifted := _shift_points(through, Vector2(0.0, -4.0))
 	out.roads[0]["points"] = shifted
 	var road_min_y := INF

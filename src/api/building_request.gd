@@ -71,6 +71,13 @@ var pile_deck_m: float = 0.0
 ## Applied after the family has built, to the mesh and the scene alike, so it
 ## works for every kind but a village; see CrookedWarp.
 var jank: float = 0.0
+## Houses only (docs/INTERIOR_DESIGN.md; HouseSpec.period_seating): may idle
+## seats stand in a room with no table? `with_table` (the default) keeps a table
+## or the fire in every room of seats -- a sitting parlour gets a small side
+## table against its wall; `without_table` is strict pre-1720 history -- seats
+## rest on the walls and the table is put away. Left out of to_dict() at the
+## default, so every request written before it is byte-identical.
+var period_seating: StringName = &"with_table"
 var _decode_errors: Array[Dictionary] = []
 
 const SCHEMA := "brickwild.request"
@@ -100,6 +107,8 @@ func to_dict() -> Dictionary:
 		out["foundation"] = String(foundation)
 	if jank != 0.0:
 		out["jank"] = jank
+	if period_seating != &"with_table":
+		out["period_seating"] = String(period_seating)
 	for field in PILE_FIELDS:
 		if float(get(field)) != 0.0:
 			out[field] = float(get(field))
@@ -131,7 +140,8 @@ static func from_dict(data: Dictionary) -> BuildingRequest:
 	var kinds: Variant = data.get("kind", "")
 	if kinds is String and StringName(kinds) in BuildingLibrary.kinds():
 		out = BuildingLibrary.defaults(StringName(kinds), 0) if out._decode_errors.is_empty() else out
-	for field in ["kind", "style", "purpose", "material", "water", "enclosure", "foundation"]:
+	for field in ["kind", "style", "purpose", "material", "water", "enclosure", "foundation",
+			"period_seating"]:
 		if not data.has(field):
 			continue
 		if not data[field] is String and not data[field] is StringName:
@@ -257,6 +267,7 @@ func copy() -> BuildingRequest:
 	out.ground_fall_m = ground_fall_m
 	out.ground_downhill_deg = ground_downhill_deg
 	out.foundation = foundation
+	out.period_seating = period_seating
 	out.pile_water_m = pile_water_m
 	out.pile_freeboard_m = pile_freeboard_m
 	out.pile_deck_m = pile_deck_m

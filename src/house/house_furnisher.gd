@@ -40,6 +40,11 @@ static func furnish(plan: HousePlan, spec: HouseSpec) -> void:
 				plan.hearth["breast"] = breast
 				plan.hearth["host_kind"] = "ordinary_fireplace"
 	HousePlanFeatures.reserve_domestic_hearth_tending(plan, spec)
+	# HOME-BRIEF: who lives here is decided before any room is furnished, so
+	# beds, places at table and the table itself are sized to the household.
+	plan.domestic_layout.erase("household")
+	if HouseHousehold.applies(plan):
+		plan.domestic_layout["household"] = HouseHousehold.brief(plan)
 	if HouseFurnishingRecipes.is_ordinary_house(plan):
 		_select_household_dining_room(plan)
 	# This whole-plan report is also the pre-room baseline for the first room.
@@ -50,6 +55,7 @@ static func furnish(plan: HousePlan, spec: HouseSpec) -> void:
 		nav_report = _furnish_room(plan, spec, i, nav_report)
 	HouseFurnishRepair.relax(plan)
 	_audit_activity_groups(plan)
+	_record_household_outcome(plan)
 	# The existing Workbench Pot remains the prep vessel. A second, explicit
 	# structural record authorizes the actual model instance suspended over the
 	# native fireplace; the assembler must not invent one from a row count.
@@ -72,6 +78,32 @@ static func furnish(plan: HousePlan, spec: HouseSpec) -> void:
 	HouseWitchProps.plan_props(plan)
 
 
+## HOME-BRIEF: what the furnished house actually gives its household, beside
+## what the brief asked for. A bed or a place that did not fit is a recorded
+## shortfall on the brief, not a silent difference (the catalogue's only bed is
+## a 1.88 m double; two will not go into a 4 m square chamber with their
+## bedside clearances -- HOME-ASSETS / HOME-PARLOUR).
+static func _record_household_outcome(plan: HousePlan) -> void:
+	if not plan.domestic_layout.has("household"):
+		return
+	var household: Dictionary = plan.domestic_layout["household"]
+	var beds := 0
+	var places := 0
+	var dining: int = int(plan.domestic_layout.get("dining_room", -1))
+	for piece in plan.furniture:
+		var category := String(piece.get("cat", ""))
+		if category == "bed" and not bool(piece.get("mounted", false)):
+			beds += 1
+		elif category == "seat" and int(piece.get("room", -1)) == dining \
+				and String(piece.get("activity_group", "")) == "eating":
+			places += 1
+	household["beds_placed"] = beds
+	household["sleepers_placed"] = beds * HouseHousehold.SLEEPERS_PER_BED
+	household["places_laid"] = places
+	household["short"] = maxi(int(household.get("beds", 0)) - beds, 0) > 0 \
+		or places < int(household.get("places", 0))
+
+
 ## Choose one room for the household's meal before room recipes run. This is a
 ## bounded physical trial of the real measured table and complete seat set,
 ## using door, window, zone and stair reservations. Upper rooms are considered
@@ -84,6 +116,18 @@ static func _select_household_dining_room(plan: HousePlan) -> void:
 	plan.domestic_layout.erase("dining_selection_reason")
 	plan.domestic_layout["dining_probe_count"] = 0
 	var capacity: int = _household_seat_capacity(plan)
+	# HOME-HEARTH: a living hall is where the household eats -- by its fire,
+	# beside the cooking -- not the parlour next door. The bare probe cannot
+	# reserve the hearth and cooking core the recipe places first, so the hall
+	# is chosen outright and the final group audit proves (or reports) the meal.
+	if HousePlanRooms.living_hall_grammar(plan.spec):
+		for hall in plan.rooms_of(&"hall"):
+			if plan.storey_of_room(hall) == 0 and plan.hearth_room() == hall:
+				plan.domestic_layout["dining_room"] = hall
+				plan.domestic_layout["dining_selection"] = "pending_final_audit"
+				plan.domestic_layout["dining_selection_reason"] = \
+					"living hall: the household eats by its fire"
+				return
 	var candidates: Array[int] = []
 	# Preserve authored dining rooms. For ordinary rooms, the ground hall gets
 	# first choice when it is not also doing the work of a kitchen or bedroom.
@@ -658,10 +702,15 @@ static func _anybody_sleeps(plan: HousePlan) -> bool:
 	return false
 
 
-## One sleeping room represents one household room, with two ordinary places
-## at the meal table. The measured table and chair footprints decide what can
-## physically fit; a shortfall is reported by the group audit.
+## Places at the household's meal table. With a household brief (HOME-BRIEF)
+## it is the head-count; otherwise one sleeping room stands for two places, as
+## before. The measured table and chair footprints decide what can physically
+## fit; a shortfall is reported by the group audit.
 static func _household_seat_capacity(plan: HousePlan) -> int:
+	var household: Dictionary = HouseHousehold.of(plan)
+	if not household.is_empty():
+		var laid_by_style := int(HouseSpec.STYLES.get(plan.spec.style, {}).get("dining_seats", 0))
+		return clampi(maxi(int(household.get("places", 2)), laid_by_style), 2, 8)
 	var sleeping_rooms := 0
 	for kind in HouseGeometry.SLEEPING:
 		sleeping_rooms += plan.rooms_of(kind).size()

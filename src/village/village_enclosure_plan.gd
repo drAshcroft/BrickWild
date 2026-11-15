@@ -6,9 +6,30 @@ const EDGE_BAND := 6.0
 const GATE_MARGIN := 0.8
 const EPS := 0.01
 
-static func build(plan: VillagePlan, edge_band: float = EDGE_BAND) -> Dictionary:
+## VREAL-WALL (docs/VILLAGE_REAL_LAYOUT.md). A BUILT edge -- the hedge, the
+## palisade, the wall a village asked for -- runs round its buildings, as a
+## real one does: over 13 walled sites the median distance from a town wall to
+## the nearest building inside it is 5.4 m (VillageRealLayout.WALL_TO_BUILDING_M).
+## It used to be the convex hull of every LOT plus EDGE_BAND, and the farm
+## yards, the field tracks and the hull's empty corners stood it tens of
+## metres off the houses. Now it is a closing of the buildings and the
+## commons: each grown by HUG_CLOSE_M + HUG_BAND, merged, shrunk back by
+## HUG_CLOSE_M -- so two houses closer than twice HUG_CLOSE_M share one run
+## of wall rather than a notch between them -- and simplified to runs no
+## shorter than a wall stair needs. A village whose buildings do not close
+## into one ring (a straggler beyond the bridge) keeps the hull.
+## The edge an UNENCLOSED village is dressed along is still the lot hull.
+const HUG_BAND := 6.0
+const HUG_CLOSE_M := 18.0
+const HUG_SIMPLIFY_M := 1.5
+
+static func build(plan: VillagePlan, edge_band: float = EDGE_BAND, hug := false) -> Dictionary:
 	var hull := _lot_hull(plan)
 	var edge := _offset_hull(hull, edge_band)
+	if hug:
+		var ring := hug_ring(plan)
+		if ring.size() >= 3:
+			edge = ring
 	# The site is the available ground. Clip the offset at its inner edge:
 	# lots near the parcel limit must not put a wall beyond both the ground
 	# mesh and the endpoints of the approach roads.
@@ -242,12 +263,110 @@ static func crossings(roads: Array[Dictionary], edge: PackedVector2Array) -> Arr
 	return out
 
 
+## The ring HUG_BAND out from the buildings and commons, closed over gaps
+## narrower than twice HUG_CLOSE_M. Empty when they do not close into one.
+static func hug_ring(plan: VillagePlan) -> PackedVector2Array:
+	var grown: Array[PackedVector2Array] = []
+	var parts: Array[PackedVector2Array] = []
+	for b in plan.buildings:
+		parts.append(VillageMeasure.bounds_poly(b))
+	for c in plan.commons:
+		parts.append(c["poly"])
+	for p in parts:
+		var outer := _largest(Geometry2D.offset_polygon(p, HUG_CLOSE_M + HUG_BAND))
+		if outer.size() >= 3:
+			grown.append(outer)
+	if grown.is_empty():
+		return PackedVector2Array()
+	# union: fold each grown shape into the first one it overlaps, until none do
+	var pieces: Array[PackedVector2Array] = []
+	for g in grown:
+		var cur: PackedVector2Array = g
+		var merged := true
+		while merged:
+			merged = false
+			for k in range(pieces.size() - 1, -1, -1):
+				if Geometry2D.intersect_polygons(cur, pieces[k]).is_empty():
+					continue
+				cur = _largest(Geometry2D.merge_polygons(cur, pieces[k]))
+				pieces.remove_at(k)
+				merged = true
+		pieces.append(cur)
+	if pieces.size() != 1:
+		return PackedVector2Array()
+	var ring := _largest(Geometry2D.offset_polygon(pieces[0], -HUG_CLOSE_M))
+	if ring.size() < 3:
+		return PackedVector2Array()
+	ring = _simplify(ring, HUG_SIMPLIFY_M)
+	# a thin neck can part in the shrink: every building and common must
+	# still be wholly inside, or the hull stands
+	for p in parts:
+		if not Geometry2D.clip_polygons(p, ring).is_empty():
+			return PackedVector2Array()
+	return ring
+
+
+static func _largest(polys: Array[PackedVector2Array]) -> PackedVector2Array:
+	var best := PackedVector2Array()
+	var best_a := -1.0
+	for p in polys:
+		var a := absf(Poly.area(p))
+		if a > best_a:
+			best_a = a
+			best = p
+	return best
+
+
+## Douglas-Peucker on a closed ring: no vertex kept that lies within `tol`
+## of the run between its kept neighbours.
+static func _simplify(ring: PackedVector2Array, tol: float) -> PackedVector2Array:
+	if ring.size() <= 4:
+		return ring
+	# split the ring at its two farthest-apart vertices and simplify each half
+	var far := 0
+	var best := 0.0
+	for i in ring.size():
+		var d := ring[0].distance_squared_to(ring[i])
+		if d > best:
+			best = d
+			far = i
+	var a := ring.slice(0, far + 1)
+	var b := ring.slice(far)
+	b.append(ring[0])
+	var out := _dp(a, tol)
+	var tail := _dp(b, tol)
+	out.remove_at(out.size() - 1)
+	tail.remove_at(tail.size() - 1)
+	out.append_array(tail)
+	return out
+
+
+static func _dp(line: PackedVector2Array, tol: float) -> PackedVector2Array:
+	if line.size() <= 2:
+		return line
+	var idx := 0
+	var dmax := 0.0
+	for i in range(1, line.size() - 1):
+		var c := Geometry2D.get_closest_point_to_segment(line[i], line[0], line[line.size() - 1])
+		var d := c.distance_to(line[i])
+		if d > dmax:
+			dmax = d
+			idx = i
+	if dmax <= tol:
+		return PackedVector2Array([line[0], line[line.size() - 1]])
+	var left := _dp(line.slice(0, idx + 1), tol)
+	var right := _dp(line.slice(idx), tol)
+	left.remove_at(left.size() - 1)
+	left.append_array(right)
+	return left
+
+
 static func author(plan: VillagePlan) -> void:
 	plan.enclosure = PackedVector2Array()
 	plan.gate_crossings.clear()
 	if plan.spec.enclosure == &"none":
 		return
-	var derived := build(plan)
+	var derived := build(plan, EDGE_BAND, true)
 	plan.enclosure = derived["edge"]
 	plan.enclosure_kept_fraction = clampf(plan.spec.enclosure_kept_fraction, 0.0, 1.0)
 	plan.gate_crossings.assign(derived["gates"])
