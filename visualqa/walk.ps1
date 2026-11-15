@@ -46,7 +46,11 @@ if ($Bake) {
     $log = Join-Path $root "artifacts\walk_villages\bake_$series.log"
     New-Item -ItemType Directory -Force (Split-Path $log) | Out-Null
     Write-Host "Baking series '$series' (log: $log). The walk can start meanwhile; unbaked villages generate live."
-    & $godot --path $root --script res://tools/bake_walk_villages.gd -- "--series=$series" @Rest *> $log
+    # The console build, not $godot: PowerShell does not wait for a GUI-subsystem
+    # exe, so with $godot this returned at once, the log stayed empty and the
+    # bake ran on unseen (15 Nov).
+    $console = $godot -replace '\.exe$', '_console.exe'
+    & $console --path $root --script res://tools/bake_walk_villages.gd -- "--series=$series" @Rest *> $log
     Write-Host "Bake finished: $((Select-String -Path $log -Pattern '^bake: finished').Line)"
     exit
 }

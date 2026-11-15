@@ -12,7 +12,7 @@ static func generate(spec: ShopSpec, p_seed: int, with_furniture := true) -> Hou
 	spec.seed = p_seed
 	spec.rng.seed = p_seed
 	spec.storeys = clampi(spec.storeys, 1, 3)
-	var style: Dictionary = HouseSpec.STYLES[spec.style]
+	var style: Dictionary = spec.style_row()   # VILLAGE-VERNACULAR: its look, if any
 	var r := spec.rng
 
 	spec.roof_pitch = r.randf_range(float(style["roof_pitch"][0]), float(style["roof_pitch"][1]))
@@ -29,6 +29,11 @@ static func generate(spec: ShopSpec, p_seed: int, with_furniture := true) -> Hou
 		spec.parapet = float(style.get("parapet", 0.0)) >= 1.0
 		spec.roof_span_out = float(style.get("span_out", -1.0))
 		spec.roof_along_out = float(style.get("along_out", -1.0))
+	elif spec.look.has("roof_types") and not (style.get("roof_types", []) as Array).is_empty():
+		# VILLAGE-VERNACULAR: a shop's roof is otherwise always the spec's gable;
+		# a look that names the form (a minka's irimoya, a bastide's hip) is the
+		# form, with no draw, so no shop without a look moves
+		spec.roof_type = StringName(style["roof_types"][0])
 	spec.porch = r.randf() < float(style["porch"])
 	spec.chimney = r.randf() < float(style["chimney"])
 	# a smithy or a bakehouse is its fire: the flue is not a dice roll

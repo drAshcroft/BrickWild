@@ -162,6 +162,155 @@ var pile_deck: float = 0.0
 ## carry their measured shell thickness here; the negative value preserves the
 ## historical material-derived default for ordinary houses.
 var wall_thickness_override: float = -1.0
+## A per-house LOOK (VILLAGE-VERNACULAR; docs/VILLAGE_VERNACULAR.md): a patch
+## over this style's own row in STYLES, applied before the generator reads it.
+## It may only CHANGE a value the row already has (LOOK_KEYS, and never a key
+## the row lacks), so the generator takes exactly the draws it always took, in
+## the same order: a patch moves what a draw lands on, never which draws there
+## are. Empty -- the default -- is the style row itself, byte for byte.
+## Never drawn from `rng`. `style_row()` is the one place it is applied.
+var look: Dictionary = {}
+
+## What a look may change, and how each value is read:
+##   colour  -- a hex string, or [hex, hex]: the row's lerp ends
+##   range   -- [min, max] numbers inside LOOK_RANGES
+##   chance  -- a number 0..1
+##   names   -- a non-empty list of names from LOOK_NAMES
+##   name    -- one name from LOOK_NAMES
+##   number  -- a number inside LOOK_RANGES
+## Programme keys (domestic_program, min_storeys, beds_upstairs), the
+## vernacular flags (sahel, terraced, raised_floor, engawa) and wall_t are not
+## here: they decide planning, and a look is an exterior.
+const LOOK_KEYS := {
+	"wall": "colour", "trim": "colour", "roof": "colour", "floor": "colour",
+	"roof_pitch": "range", "studs": "range", "plinth": "range", "clutter": "range",
+	"porch": "chance", "chimney": "chance", "shutters": "chance", "timber": "chance",
+	"braces": "chance", "rail": "chance", "jetty": "chance", "dormers": "chance",
+	"bargeboards": "chance", "stone_ground": "chance", "parapet": "chance",
+	"veranda": "chance",
+	"roof_types": "names", "framing": "names", "truss": "names",
+	"roof_material": "name", "chimney_style": "name",
+	"span_out": "number", "along_out": "number",
+}
+const LOOK_RANGES := {
+	"roof_pitch": [0.0, 1.8], "studs": [0.25, 2.0], "plinth": [0.0, 1.0],
+	"clutter": [0.0, 1.0], "span_out": [0.1, 1.2], "along_out": [0.1, 1.2],
+}
+const LOOK_NAMES := {
+	"roof_types": [&"gable", &"half_hipped", &"hipped", &"flat", &"irimoya", &"conical"],
+	"framing": [&"close_studding", &"square_panel", &"saltire", &"arch_brace"],
+	"truss": [&"king_post", &"queen_post", &"collar_strut"],
+	"roof_material": [&"shingle", &"slate", &"tile", &"thatch", &"earth"],
+	"chimney_style": [&"stepped", &"straight", &"louver"],
+}
+## The roof forms a style's builder has been measured to make (docs/
+## VILLAGE_VERNACULAR.md, "What a look may ask of a style"). A look naming
+## another is refused: an irimoya is the minka's own roof, and a cone wants a
+## round plan. A style not listed keeps exactly its own row's forms.
+const LOOK_ROOFS := {
+	&"cottage": [&"gable", &"half_hipped", &"hipped"],
+	&"farmhouse": [&"gable", &"half_hipped", &"hipped"],
+	&"townhouse": [&"gable", &"half_hipped", &"hipped"],
+	&"longhall": [&"gable", &"half_hipped", &"hipped"],
+	&"rich": [&"gable", &"half_hipped", &"hipped"],
+	&"mediterranean": [&"gable", &"hipped", &"flat"],
+}
+
+
+## This spec's style row with its look applied: what the generator reads.
+func style_row() -> Dictionary:
+	return HouseSpec.patched_row(style, look)
+
+
+## `STYLES[style]` with `patch` laid over it. Colours become [hex, hex] and
+## name lists StringNames, so a look that came through JSON reads exactly as
+## one written in GDScript. An empty patch returns the row itself.
+static func patched_row(p_style: StringName, patch: Dictionary) -> Dictionary:
+	var base: Dictionary = STYLES.get(canonical_style(p_style), {})
+	if patch.is_empty() or base.is_empty():
+		return base
+	var row := base.duplicate()
+	for key in patch:
+		var k := String(key)
+		if not LOOK_KEYS.has(k) or not base.has(k):
+			continue
+		var v: Variant = patch[key]
+		match String(LOOK_KEYS[k]):
+			"colour":
+				var ends: Array = v if v is Array else [v, v]
+				if ends.size() == 1:
+					ends = [ends[0], ends[0]]
+				row[k] = [String(ends[0]).trim_prefix("#"), String(ends[1]).trim_prefix("#")]
+			"range":
+				row[k] = [float(v[0]), float(v[1])]
+			"chance", "number":
+				row[k] = float(v)
+			"names":
+				var names: Array = []
+				for n in v:
+					names.append(StringName(String(n)))
+				row[k] = names
+			"name":
+				row[k] = StringName(String(v))
+	return row
+
+
+## Everything wrong with `patch` as a look for `p_style`; empty is a look
+## the generator will honour exactly.
+static func look_errors(p_style: StringName, patch: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	var id := canonical_style(p_style)
+	var base: Dictionary = STYLES.get(id, {})
+	if base.is_empty():
+		out.append("look: unknown style '%s'" % String(p_style))
+		return out
+	for key in patch:
+		var k := String(key)
+		var v: Variant = patch[key]
+		if not LOOK_KEYS.has(k):
+			out.append("look: '%s' is not something a look may change" % k)
+			continue
+		if not base.has(k):
+			out.append("look: a %s has no '%s' to change" % [String(id), k])
+			continue
+		match String(LOOK_KEYS[k]):
+			"colour":
+				var ends: Array = v if v is Array else [v]
+				if ends.is_empty() or ends.size() > 2:
+					out.append("look: '%s' wants a hex colour or two" % k)
+				for e in ends:
+					if not (e is String or e is StringName) or not Color.html_is_valid(String(e)):
+						out.append("look: '%s' is not a hex colour: %s" % [k, str(e)])
+			"range":
+				var lim: Array = LOOK_RANGES[k]
+				if not v is Array or v.size() != 2 or not _is_num(v[0]) or not _is_num(v[1]):
+					out.append("look: '%s' wants [min, max]" % k)
+				elif float(v[0]) > float(v[1]) or float(v[0]) < float(lim[0]) or float(v[1]) > float(lim[1]):
+					out.append("look: '%s' %s is outside %s" % [k, str(v), str(lim)])
+			"chance":
+				if not _is_num(v) or float(v) < 0.0 or float(v) > 1.0:
+					out.append("look: '%s' wants a chance 0..1" % k)
+			"number":
+				var lim: Array = LOOK_RANGES[k]
+				if not _is_num(v) or float(v) < float(lim[0]) or float(v) > float(lim[1]):
+					out.append("look: '%s' wants a number in %s" % [k, str(lim)])
+			"names", "name":
+				var names: Array = v if v is Array else [v]
+				if names.is_empty():
+					out.append("look: '%s' wants at least one name" % k)
+				for n in names:
+					if not (n is String or n is StringName) or not StringName(String(n)) in LOOK_NAMES[k]:
+						out.append("look: '%s' has no '%s'" % [k, str(n)])
+				if k == "roof_types":
+					var allowed: Array = LOOK_ROOFS.get(id, base.get("roof_types", []))
+					for n in names:
+						if (n is String or n is StringName) and not StringName(String(n)) in allowed:
+							out.append("look: a %s cannot build a '%s' roof" % [String(id), String(n)])
+	return out
+
+
+static func _is_num(v: Variant) -> bool:
+	return v is float or v is int
 
 ## Styles carry their own timber: `timber` is the chance of an exposed frame at
 ## all, `studs` the spacing between uprights (a town house is close-studded,

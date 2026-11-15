@@ -63,11 +63,29 @@ renderer keeps no meshes) plans and assembles each stop once and saves
 `artifacts/walk_villages/<series>/<NN>_seed<S>.scn` + `.json` (the building
 rows: request, transform, door). The rig loads a bake in seconds and plans
 live only what is not baked (or with `--live`, or with Cutaway ticked). A bake
-of an edited stop is ignored. A bake from another commit is still used, but the
-sidebar says "HEAD is now ...: re-bake before trusting a pin". The commit is
-read from `.git`, so uncommitted changes are not noticed. `-Bake` skips what is
-already baked at this commit; pass `--force` to re-bake, `--stops=1,4` or
-`--seeds=1,2,3` to choose.
+of an edited stop is ignored. A bake is **stale** when a generator file
+(`src/`, `core/`, `qa/`, `assets/props/`, `tests/fixtures/terrain/`) differs
+between the bake's commit and the working tree -- committed since or edited
+and not committed (`git diff --name-only`, `WalkVillage.changed_since`). A
+stale bake is still loaded, and a red line under the title says
+"STALE BAKE: N generator files changed since ... This is the OLD village".
+A commit of docs or of the rig leaves the bakes current. A bake also records
+`tree_state`, a hash of the generator files as they differ from its commit,
+untracked ones included (`WalkVillage.tree_state`). A bake made from work not
+yet committed is therefore current while that work is unchanged, and stale as
+soon as one of those files is edited. `-Bake` skips what is
+current by the same test; pass `--force` to re-bake anyway (needed after a
+change to how `walk_village.gd` plans), `--stops=1,4` or `--seeds=1,2,3` to
+choose. `-Bake` runs the console build of Godot so the launcher waits and
+`artifacts/walk_villages/bake_<series>.log` gets the output; the GUI build
+returned at once and logged nothing (15 Nov).
+
+**After a generator change, re-bake before walking.** On 15 Nov the walk was
+still showing the 29 Oct villages two weeks after VREAL (sizes, types, packing,
+the gradient, the hugging wall; `docs/VILLAGE_REAL_LAYOUT.md`) and the
+household interiors (`docs/INTERIOR_DESIGN.md`) landed: the old bakes were
+loaded under a grey "HEAD is now" line. The 1 Nov bake took 66 minutes for
+the twelve stops.
 
 In a village:
 
@@ -83,6 +101,55 @@ In a village:
   takes another baked seed of the same stop if there is one, else plans a
   random seed live. **Skip** moves on. **Build** builds the sidebar's single
   building and steps off the series; "Save & next village" goes back to it.
+
+### Regional villages: the `vernacular` series
+
+```powershell
+.\visualqa\walk.ps1 -Bake -Villages vernacular     # about an hour, in the background
+.\visualqa\walk.ps1 -Villages vernacular           # walk them
+.\visualqa\walk.ps1 --villages=vernacular --stop=9 # straight to the Norse/Japanese hybrid
+```
+
+Twelve villages built from the regional dataset
+(`docs/VILLAGE_VERNACULAR.md`):
+
+| Stops | What they are |
+|---|---|
+| 1-2 | Provence: a hill-town market, and a rich farming village |
+| 3-5 | the Cyclades: a coast village, real cliffs (Manarola's ground), and a poor hamlet |
+| 6 | the Norse north: a farm village on a stream |
+| 7-8 | Japan: a farming village, and a post town |
+| 9 | a hybrid people: half Norse, half Japanese |
+| 10 | two peoples side by side: Provencal and Norse (coherence 1) |
+| 11 | one region's paint on another's houses: Cycladic whitewash on Provencal houses |
+| 12 | one region's roofs on another's houses: Japanese roofing on Cycladic cubes |
+
+A stop names its regions in `vernacular`, a plain `{"provence": 1.0}` or
+`{"blend": {...}, "groups": {"roofs": {"japanese": 1.0}}, "coherence": 0.5}`. Add a
+stop to try a blend of your own.
+
+What the rig adds for these:
+
+- **The sidebar** names the village (Mirabrune, Kato Kamnos, Svaloy...), its
+  regions, and **VillageVernacularCheck**'s verdict: ok with the signature
+  measured (`white_walls 0.8, flat_roofs 1.0, ...`), or the failures. A trait
+  the village is too small to judge says `skipped`.
+- **Your review** in `HumanRate.md` carries a `Vernacular:` line with the same
+  verdict. The request (with its `vernacular`) is there to reproduce it.
+- **The pin record** in `walk_pins.jsonl` carries `vernacular_label` and
+  `vernacular_check`. When your eye and the check disagree, an agent can turn
+  the pin into a test: a signature threshold, a cluster, or a house type that
+  is wrong in the dataset.
+- **"This building alone"** on a pinned house reopens it with its storeys and
+  its look (`--storeys=2 --look64=...`, the look as base64 JSON), so the house
+  you reopen is the house you pinned. The sidebar says "a village look". Change
+  the style by hand and the look is dropped, because a look is a patch over one
+  style's row.
+
+Worth pinning: anything that does not read as its region, wealth that does not
+show, a colour that looks wrong for the place, and a blend that reads as one
+parent only. Known stand-ins (Japan's church; no olive or cypress trees) are
+already filed as `VERN-JAPAN-LANDMARK` and `VERN-MED-TREES`.
 
 ## Walking a building (Godot)
 

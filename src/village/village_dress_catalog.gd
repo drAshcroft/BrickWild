@@ -151,6 +151,17 @@ const PALETTES := {
 		"ground": ["Wild_Mushroom_*", "Wild_Pebble_Square_*"]},
 }
 
+## The palette a village plants from: a vernacular village's blend
+## (VillageVernacular.plant_palette), a site brief's named palette, else its
+## culture's -- English when none of those has a row.
+static func palette_of(spec: VillageSpec) -> Dictionary:
+	var fs: VillageVernacular = spec.feature_set()
+	if fs != null:
+		return fs.plant_palette()
+	var palette_id: StringName = spec.plant_palette if spec.site_brief else spec.culture
+	return PALETTES.get(palette_id, PALETTES.get(spec.culture, PALETTES[&"english"]))
+
+
 ## Rushes and sedge for a bank. Every culture's water has them, so they are
 ## not a row of PALETTES: `palette_keys` falls back to this for the `reed` slot.
 const REEDS: Array = ["Wild_Grass_Wispy_Tall", "Wild_Grass_Common_Tall", "Nature_Grass_Large"]

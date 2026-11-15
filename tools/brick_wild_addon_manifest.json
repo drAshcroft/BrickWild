@@ -116,6 +116,10 @@
     {
       "source": "assets/props/catalog.json",
       "destination": "assets/props/catalog.json"
+    },
+    {
+      "source": "src/village/vernacular_regions.json",
+      "destination": "families/village/vernacular_regions.json"
     }
   ],
   "trees": [

@@ -50,6 +50,7 @@ Everything a person chooses; everything else comes from the seed.
 | `enclosure` | `none`, `hedge`, `palisade`, `wall` | what the edge is made of; `wall` needs `population ≥ 150` or `garrison` |
 | `water` | `none`, `pond`, `stream`, `river`, `coast` | a water body on the site, which the mill, the ford/bridge and the fishing strand need |
 | `seed` | int | everything else |
+| `vernacular` | `{}` or a blend of regions, e.g. `{"provence": 1.0}` | optional: the house types, colours, roofs, landmark, plants, ground and name of a real region (Provence, the Cyclades, the Norse north, Japan) or a blend of them, drawn per household by wealth tier; empty is the culture alone. docs/VILLAGE_VERNACULAR.md |
 
 Derived, and recorded on the spec so a variant is reproducible from the
 seven inputs alone:

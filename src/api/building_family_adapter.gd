@@ -208,6 +208,7 @@ class HouseFamily extends PlanFamily:
 		var spec := HouseSpec.new()
 		spec.material = request.material
 		_copy_size_and_style(request, spec)
+		spec.look = request.look.duplicate(true)
 		spec.trade = request.purpose
 		spec.storeys = request.storeys
 		out.plan = HouseGenerator.generate(spec, request.seed, furnish)
@@ -239,6 +240,7 @@ class ShopFamily extends PlanFamily:
 		var spec := ShopSpec.new()
 		spec.material = request.material
 		_copy_size_and_style(request, spec)
+		spec.look = request.look.duplicate(true)
 		spec.business = request.purpose
 		spec.storeys = request.storeys
 		out.plan = ShopGenerator.generate(spec, request.seed, furnish)
@@ -301,6 +303,7 @@ class ChurchFamily extends BuildingFamilyAdapter:
 		var spec := ChurchSpec.new()
 		_copy_size_and_style(request, spec)
 		ChurchGenerator.generate(spec, request.seed)
+		_apply_look_colours(request, spec)
 		out.spec = spec
 		return true
 
@@ -389,6 +392,7 @@ class CastleFamily extends BuildingFamilyAdapter:
 		var spec := CastleSpec.new()
 		_copy_size_and_style(request, spec)
 		CastleGenerator.generate(spec, request.seed)
+		_apply_look_colours(request, spec)
 		out.spec = spec
 		return true
 
@@ -793,6 +797,7 @@ class VillageFamily extends BuildingFamilyAdapter:
 		spec.compact_display = request.compact_display
 		spec.decoration_level = request.decoration_level
 		spec.upkeep = request.upkeep
+		spec.vernacular = request.vernacular.duplicate(true)
 		_copy_orientation_and_period(request, spec)
 		if not spec.valid():
 			return false
@@ -845,6 +850,12 @@ static func colours(spec: RefCounted) -> Array:
 		var ground: Array = []
 		for i in range(VillageBuilder.SURFACES):
 			ground.append(Color(String(VillageBuilder.COLOURS.get(i, "808080"))))
+		# VILLAGE-VERNACULAR: a region's own ground, road and common
+		var fs: VillageVernacular = (spec as VillageSpec).feature_set()
+		if fs != null:
+			var own: Dictionary = fs.ground_colours()
+			for surf in own:
+				ground[int(surf)] = own[surf]
 		return ground
 	if spec is TempleSpec:
 		# a temple's fourth surface is its own darkness, not a floor colour
@@ -871,6 +882,26 @@ static func colours(spec: RefCounted) -> Array:
 
 ## The inside of a temple, which is not a floor colour and never was.
 const TEMPLE_DARK := Color("07070a")
+
+
+## The colour-only look of a family that is not a house (VILLAGE-VERNACULAR):
+## `wall` is the masonry (`stone_color`), `trim` and `roof` their own fields.
+## A colour is a hex or [hex, hex]; [a, b] is read at its midpoint, since a
+## church or castle is one building and not a draw over many.
+const LOOK_COLOUR_FIELDS := {"wall": "stone_color", "trim": "trim_color", "roof": "roof_color"}
+
+static func _apply_look_colours(request: BuildingRequest, spec: RefCounted) -> void:
+	for key in request.look:
+		var field: String = LOOK_COLOUR_FIELDS.get(String(key), "")
+		if field.is_empty() or not field in spec:
+			continue
+		var v: Variant = request.look[key]
+		var ends: Array = v if v is Array else [v, v]
+		if ends.is_empty():
+			continue
+		var a := Color(String(ends[0]))
+		var b := Color(String(ends[ends.size() - 1]))
+		spec.set(field, a.lerp(b, 0.5))
 
 
 ## The three fields every family names the same way. A family whose spec

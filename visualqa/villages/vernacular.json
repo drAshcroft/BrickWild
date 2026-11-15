@@ -1,0 +1,53 @@
+{
+  "about": "VILLAGE-VERNACULAR (docs/VILLAGE_VERNACULAR.md): villages built from a region of the vernacular dataset (src/village/vernacular_regions.json) -- Provence, the Cyclades, the Norse north, Japan -- at both ends of wealth, on flat ground and on real cliffs, then the blends: a hybrid people, two peoples side by side, one region's paint on another's houses, one region's roofs on another's. Each stop is a VillageSpec plus `vernacular` (a plain {region: weight}, or {blend, groups, coherence}). The sidebar names the region and the village and shows VillageVernacularCheck's verdict; a pin's record carries both. Walk: .\\visualqa\\walk.ps1 -Villages vernacular. Bake first (about an hour): .\\visualqa\\walk.ps1 -Bake -Villages vernacular",
+  "stops": [
+    {
+      "why": "Provence: a hill-town market -- ochre, sand and rose render, lavender and sage shutters, canal tile, tall village houses round a Romanesque church",
+      "vernacular": {"provence": 1.0}, "purpose": "market", "population": 70, "wealth": 0.6, "seed": 1
+    },
+    {
+      "why": "Provence, rich and farming: long low mas and square bastides under hipped tile; the money should show in size and storeys",
+      "vernacular": {"provence": 1.0}, "purpose": "farming", "population": 45, "wealth": 0.9, "seed": 2
+    },
+    {
+      "why": "Cyclades: a fishing village on the coast -- lime-white cubes, flat roofs behind parapets, blue, green and oxblood doors, a blue-domed chapel",
+      "vernacular": {"cyclades": 1.0}, "purpose": "fishing", "water": "coast", "population": 50, "seed": 3
+    },
+    {
+      "why": "Cyclades on real cliffs (Manarola's ground): white cubes stepping down to the sea",
+      "vernacular": {"cyclades": 1.0}, "purpose": "fishing", "terrain": "manarola", "population": 40, "seed": 4
+    },
+    {
+      "why": "Cyclades, poor: a farming hamlet -- small cubes, one storey, the whitewash a little greyed",
+      "vernacular": {"cyclades": 1.0}, "purpose": "farming", "population": 24, "wealth": 0.1, "seed": 5
+    },
+    {
+      "why": "Norse: a farm village on a stream -- tarred stave longhouses, falu red and ochre log houses with white trim, turf and tarred shingle, a stave church",
+      "vernacular": {"norse": 1.0}, "purpose": "farming", "water": "stream", "population": 50, "wealth": 0.4, "seed": 6
+    },
+    {
+      "why": "Japan: a farming village -- minka under straw thatch and grey kawara tile, engawa, dark frames on earth and lime plaster (the church is a stand-in: VERN-JAPAN-LANDMARK)",
+      "vernacular": {"japanese": 1.0}, "purpose": "farming", "water": "stream", "population": 50, "seed": 7
+    },
+    {
+      "why": "Japan: a post town on a crossroads -- two-storey machiya, dark timber fronts, tiled irimoya roofs",
+      "vernacular": {"japanese": 1.0}, "purpose": "crossroads", "population": 70, "wealth": 0.6, "seed": 8
+    },
+    {
+      "why": "Blend, one hybrid people: half Norse, half Japanese, each house drawing its type, walls, trim and roof from either",
+      "vernacular": {"norse": 0.5, "japanese": 0.5}, "purpose": "farming", "population": 50, "seed": 9
+    },
+    {
+      "why": "Blend, two peoples side by side: Provencal and Norse houses, each house wholly one or the other (coherence 1)",
+      "vernacular": {"blend": {"provence": 0.6, "norse": 0.4}, "coherence": 1.0}, "purpose": "market", "population": 60, "seed": 10
+    },
+    {
+      "why": "Blend, one region's paint on another's houses: Provencal houses and roofs, Cycladic whitewash and blue shutters",
+      "vernacular": {"blend": {"provence": 1.0}, "groups": {"walls": {"cyclades": 1.0}, "trim": {"cyclades": 1.0}}}, "purpose": "market", "population": 50, "seed": 11
+    },
+    {
+      "why": "Blend, one region's roofs on another's houses: Cycladic cubes under Japanese roofing (a mediterranean house cannot build an irimoya, so it keeps its own forms in grey tile and thatch)",
+      "vernacular": {"blend": {"cyclades": 1.0}, "groups": {"roofs": {"japanese": 1.0}}}, "purpose": "fishing", "population": 40, "seed": 12
+    }
+  ]
+}

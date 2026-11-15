@@ -83,9 +83,12 @@ func _init() -> void:
 	quit(1 if failed > 0 else 0)
 
 
+## Baked from this stop, and no generator file has changed since the bake's
+## commit (WalkVillage.stale_note: the rig's own test, so what the baker skips
+## the rig does not call stale).
 static func _current(base: String, stop: Dictionary) -> bool:
 	if not FileAccess.file_exists(base + ".json") or not FileAccess.file_exists(base + ".scn"):
 		return false
 	var side: Variant = JSON.parse_string(FileAccess.get_file_as_string(base + ".json"))
 	return side is Dictionary and String(side.get("stop_key", "")) == WalkVillage.stop_key(stop) \
-		and String(side.get("commit", "")) == WalkVillage.git_head()
+		and WalkVillage.stale_note(side) == ""

@@ -46,7 +46,9 @@ static func generate(spec: HouseSpec, p_seed: int, with_furniture := true,
 	HousePueblo.clamp_size(spec, world_family)
 	spec.storeys = clampi(spec.storeys, 1, 3)
 	spec.cellars = clampi(spec.cellars, 0, 1)
-	var s: Dictionary = HouseSpec.STYLES[spec.style]
+	# VILLAGE-VERNACULAR: the row with the spec's look laid over it (the row
+	# itself when the look is empty, which it is for every caller before it)
+	var s: Dictionary = spec.style_row()
 	var r := spec.rng
 	# A style row may ask for a storey floor (HOUSE-RICH). A rich house is read
 	# as banded storeys, and a single storey has no band to read. It comes from

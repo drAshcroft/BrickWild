@@ -69,6 +69,16 @@ var search_max_attempts: int = 0
 ## the retry ladder; when the dry, climbable ground cannot hold the programme
 ## the ladder is skipped. Conservative: it never refuses what would have fitted.
 var refuse_early: bool = true
+## The regions the village is built from (VILLAGE-VERNACULAR;
+## docs/VILLAGE_VERNACULAR.md): a plain {region: weight}, or {"blend": ...,
+## "groups": {group: {region: weight}}, "coherence": 0..1}. Empty, the
+## default, is the culture alone and moves nothing. With it, each household
+## draws its house type, walls, trim and roof from the blend, the landmark,
+## plants, ground and name come from it, and -- when `culture` is left at the
+## default -- the dominant region's culture stands for everything else.
+var vernacular: Dictionary = {}
+var _feature_set: VillageVernacular = null
+var _feature_key: String = ""
 
 # ---- derived from seed + the six above ----
 var households: int = 0
@@ -276,7 +286,22 @@ func errors() -> Array[String]:
 		out.append("enclosure 'wall' needs population >= %d or purpose 'garrison'" % WALL_MIN_POPULATION)
 	if terrain != null and not terrain.valid():
 		out.append("terrain: %s" % "; ".join(terrain.errors()))
+	if not vernacular.is_empty():
+		for why in VillageVernacular.parse(vernacular)["errors"]:
+			out.append(String(why))
 	return out
+
+
+## The resolved vernacular, or null when there is none (or it is wrong:
+## errors() says why). Cached against the dictionary's text.
+func feature_set() -> VillageVernacular:
+	if vernacular.is_empty():
+		return null
+	var key := var_to_str(vernacular)
+	if key != _feature_key:
+		_feature_key = key
+		_feature_set = VillageVernacular.resolve(vernacular)
+	return _feature_set
 
 
 ## The people the civic programme is sized for: the shown population, or the
@@ -304,6 +329,11 @@ func effective_culture() -> StringName:
 	var named := StringName(String(ground_character().get("culture", "")))
 	if culture == &"english" and named in CULTURES:
 		return named
+	# VILLAGE-VERNACULAR: the dominant region's culture, likewise only when
+	# the caller left the culture at the default
+	var fs := feature_set()
+	if culture == &"english" and fs != null:
+		return fs.culture()
 	return culture
 
 
@@ -350,6 +380,8 @@ func generate(p_seed: int) -> void:
 	variant_name = _derive_variant_name(seed)
 	if site_brief:
 		variant_name = _brief_variant_name(seed, source_culture, tongue)
+	elif feature_set() != null:
+		variant_name = feature_set().village_name(seed)
 
 
 ## `round(population / 4.5)`, then nudged +-10% by a value drawn from the

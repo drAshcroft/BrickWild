@@ -101,9 +101,17 @@ static func programme(spec: VillageSpec) -> Array[BuildingRequest]:
 	rng.seed = hash("programme|%d" % spec.seed)
 
 	var areas: Array[float] = house_areas(spec)
-	var mix: Array[StringName] = _mixed_styles(spec, styles, areas)
-	for i in range(spec.households):
-		out.append(_make_house(spec, styles, rng, i, mix[i] if not mix.is_empty() else &"", areas[i]))
+	var fs: VillageVernacular = spec.feature_set()
+	if fs != null:
+		# VILLAGE-VERNACULAR: every household draws its genome from the blend;
+		# the landmark is the blend's, and the shops are rebuilt below
+		styles = styles.duplicate()
+		styles["church"] = fs.landmark()["church"]
+		_vernacular_houses(out, spec, areas, fs)
+	else:
+		var mix: Array[StringName] = _mixed_styles(spec, styles, areas)
+		for i in range(spec.households):
+			out.append(_make_house(spec, styles, rng, i, mix[i] if not mix.is_empty() else &"", areas[i]))
 
 	_append_landmark(out, spec, styles)
 	_append_shops(out, spec, styles)
@@ -116,8 +124,61 @@ static func programme(spec: VillageSpec) -> Array[BuildingRequest]:
 		out.append(BuildingRequest.castle(
 			_seed_for(spec, "manor"), styles["castle"], 40.0, 50.0, 10.0))
 
+	if fs != null:
+		_vernacular_civic(out, fs)
 	_raise_landmark(out)
 	return out
+
+
+## VILLAGE-VERNACULAR (docs/VILLAGE_VERNACULAR.md). Each household's tier
+## comes from its footprint's rank (the biggest are the rich), its genome from
+## the blend: the house type, so the chassis style and the storeys, a size
+## factor on its real footprint, and the look the request carries. The plain
+## path's stair rule still holds; the culture's style mixing does not, because
+## the type IS the mix. Nor does a real site's character (VillageTerrain.
+## character: its house_style and storeys_min): a vernacular names the
+## buildings, so on Manarola's ground a Cycladic village keeps its one and two
+## storeys and does not take the Cinque Terre's three (walk bake, 15 Nov). The
+## ground's layout traits -- form, fire_m, setback_m -- are the lot planner's
+## and still apply.
+static func _vernacular_houses(out: Array[BuildingRequest], spec: VillageSpec,
+		areas: Array[float], fs: VillageVernacular) -> void:
+	var tiers: Array[StringName] = fs.tiers_by_area(areas, spec.wealth)
+	for i in range(spec.households):
+		var trade := _trade_for(spec, i)
+		var g: Dictionary = fs.house("%d|%d" % [spec.seed, i], tiers[i], spec.purpose, trade)
+		var style: StringName = g["style"]
+		var storeys := int(g["storeys"])
+		var seed_i := _seed_for(spec, "house|%d" % i)
+		var request: BuildingRequest
+		if spec.compact_display:
+			var ramp := _ramp_dims(spec, i)
+			request = BuildingRequest.house(seed_i, style, trade, ramp.x, ramp.y, 2.6, storeys)
+		else:
+			var area: float = areas[i] * float(g["area"])
+			if area < STAIR_MIN_AREA and style != &"townhouse":
+				storeys = 1
+			var dims := house_dims(style, area, seed_i)
+			request = BuildingRequest.house(seed_i, style, trade, dims.x, dims.y, 2.6, storeys)
+		request.look = g["look"]
+		out.append(request)
+
+
+## The landmark's colours and the shops' shells. A shop is the region's shop
+## type, roofed and painted from the blend like a middling house; a church is
+## the landmark region's own (its style was asked for before it was measured).
+static func _vernacular_civic(out: Array[BuildingRequest], fs: VillageVernacular) -> void:
+	var lm: Dictionary = fs.landmark()
+	for request in out:
+		if request.kind == &"church" and request.style == lm["church"]:
+			request.look = (lm["look"] as Dictionary).duplicate(true)
+		elif request.kind == &"shop":
+			# the shop is on the ground floor of its type's house: a Provencal
+			# shop under three storeys, a machiya's under two
+			var g: Dictionary = fs.shop(str(request.seed))
+			request.style = g["style"]
+			request.look = g["look"]
+			request.storeys = int(g["storeys"])
 
 
 ## The landmark is the tallest building in the village (VILLAGES §9.4; the
@@ -165,7 +226,9 @@ static func roof_top_bound(request: BuildingRequest) -> float:
 	spec.length = request.length
 	spec.height = request.height
 	spec.storeys = clampi(request.storeys, 1, 3)
-	var style: Dictionary = HouseSpec.STYLES.get(request.style, {})
+	# VILLAGE-VERNACULAR: a look may steepen the roof, so the bound reads the
+	# row the generator will (the row itself when there is no look)
+	var style: Dictionary = HouseSpec.patched_row(request.style, request.look)
 	if style.is_empty():
 		return 0.0
 	spec.roof_pitch = float(style["roof_pitch"][1])
@@ -173,6 +236,8 @@ static func roof_top_bound(request: BuildingRequest) -> float:
 	spec.porch = true
 	spec.bargeboards = true
 	spec.roof_type = &"gable"
+	# a parapet stands over a level roof; the bound only ever rises for it
+	spec.parapet = not request.look.is_empty() and float(style.get("parapet", 0.0)) > 0.0
 	return HouseGeometry.total_height(spec)
 
 

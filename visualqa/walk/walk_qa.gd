@@ -81,6 +81,8 @@ var _cutaway: CheckBox
 var _solid_props: CheckBox
 var _build_btn: Button
 var _info: Label
+## Red, under the stop's title: the village on show is a bake older than the generator.
+var _stale_label: Label
 var _checks := {}
 var _notes: TextEdit
 var _pin_list: ItemList
@@ -156,6 +158,9 @@ var _recapture := false
 
 var _building: GeneratedBuilding
 var _request: BuildingRequest
+## --storeys and --look64 from a reopen line, with the kind and style they
+## belong to (_set_ui); _request_from_ui applies them while those still hold.
+var _arg_extra := {}
 var _placement := {}
 var _pins: Array[Dictionary] = []
 var _yaw := 0.0
@@ -276,6 +281,12 @@ func _build_ui() -> void:
 	_tour_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.45))
 	_tour_label.visible = false
 	box.add_child(_tour_label)
+	# at the top, under the stop's title: further down it scrolls out of sight
+	_stale_label = Label.new()
+	_stale_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_stale_label.add_theme_color_override("font_color", Color(1, 0.45, 0.35))
+	_stale_label.visible = false
+	box.add_child(_stale_label)
 	var grid := GridContainer.new()
 	grid.columns = 2
 	box.add_child(grid)
@@ -682,6 +693,16 @@ func _set_ui(args: Dictionary) -> void:
 	_foundation.select(1 if String(args.get("foundation", "")) == "piles" else 0)
 	_pile_water.value = float(args.get("water", "1.0"))
 	_sync_ground_ui()
+	# a pinned village house reopened alone: its storeys and its look, kept
+	# while the kind and the style are the ones they came with (a look is a
+	# patch over that style's row and means nothing on another)
+	_arg_extra = {"kind": kind, "style": String(args.get("style", ""))}
+	if args.has("storeys"):
+		_arg_extra["storeys"] = int(args["storeys"])
+	if args.has("look64"):
+		var look: Variant = JSON.parse_string(Marshalls.base64_to_utf8(String(args["look64"])))
+		if look is Dictionary:
+			_arg_extra["look"] = look
 
 
 func _kind() -> StringName:
@@ -755,6 +776,11 @@ func _request_from_ui() -> BuildingRequest:
 		req.style = _style_opt.get_item_metadata(_style_opt.selected)
 	if _purpose_opt.item_count > 0:
 		req.purpose = _purpose_opt.get_item_metadata(_purpose_opt.selected)
+	if String(_arg_extra.get("kind", "")) == String(req.kind):
+		if _arg_extra.has("storeys"):
+			req.storeys = int(_arg_extra["storeys"])
+		if _arg_extra.has("look") and String(_arg_extra.get("style", "")) == String(req.style):
+			req.look = (_arg_extra["look"] as Dictionary).duplicate(true)
 	for f in SITE_FIELDS:
 		req.set(f, (_site[f] as SpinBox).value)
 	req.jank =snappedf(_jank.value, 0.01) if _jank_row.visible else 0.0
@@ -816,7 +842,29 @@ static func _building_args(req: BuildingRequest) -> String:
 		parts.append("--fall=%s --downhill=%s" % [_num(req.ground_fall_m), _num(req.ground_downhill_deg)])
 	if req.foundation == &"piles":
 		parts.append("--foundation=piles --water=%s" % _num(req.pile_water_m))
+	# a village house is its storeys and its look (VILLAGE-VERNACULAR): without
+	# them the house that opens alone is not the house that was pinned. The look
+	# is JSON, so it travels as base64 (a shell would eat its braces and quotes).
+	if req.kind in [&"house", &"shop"] and req.storeys != 1:
+		parts.append("--storeys=%d" % req.storeys)
+	if not req.look.is_empty():
+		parts.append("--look64=%s" % Marshalls.utf8_to_base64(
+			JSON.stringify(BuildingRequest._plain(req.look))))
 	return " ".join(parts)
+
+
+## The vernacular check of a village, in one line for the sidebar and the review.
+static func _vernacular_line(check: Dictionary) -> String:
+	if bool(check.get("ok", false)):
+		var sig: Dictionary = check.get("signature", {})
+		var parts := PackedStringArray()
+		for k in sig:
+			parts.append("%s %s" % [k, str(sig[k])])
+		if parts.is_empty():
+			return "Vernacular check: ok (a blend: membership and presence)"
+		return "Vernacular check: ok — " + ", ".join(parts)
+	return "Vernacular check: %d failures — %s" % [int(check.get("failure_count", 0)),
+		"; ".join(PackedStringArray(check.get("failures", [])))]
 
 
 static func _num(v: float) -> String:
@@ -849,6 +897,10 @@ func _generate() -> void:
 	_placement = BrickWild.placement(b)
 	_place_ground(req)
 	_info.text = "%s\n%s · %s %s · seed %d" % [b.name(), req.kind, req.style, req.purpose, req.seed]
+	if req.storeys > 1:
+		_info.text += " · %d storeys" % req.storeys
+	if not req.look.is_empty():
+		_info.text += " · a village look (%d changes to the style; change the style and it is dropped)" % req.look.size()
 	if req.jank > 0.0:
 		_info.text += " · jank %.2f" % req.jank
 	if req.ground_fall_m > 0.0:
@@ -942,6 +994,9 @@ func _generate_village() -> void:
 	_request = BuildingRequest.village(v_seed, int(meta.get("population", 40)),
 		StringName(meta.get("culture", "english")), StringName(meta.get("purpose", "farming")),
 		float(meta.get("wealth", 0.4)))
+	# VILLAGE-VERNACULAR: the review and the pin record say which regions
+	if meta.get("vernacular") is Dictionary:
+		_request.vernacular = (meta["vernacular"] as Dictionary).duplicate(true)
 	_building_root = root
 	_solidify(_building_root)
 	_world.add_child(_building_root)
@@ -960,15 +1015,26 @@ func _generate_village() -> void:
 	_village_list.visible = true
 	_village_label.visible = true
 	var title := String(stop.get("why", ""))
-	_info.text = "%s%s %s village on %s · %s form · %d buildings (%d of %d extras placed) · seed %d" % [
-		title + "\n" if title != "" else "", String(meta.get("culture", "")).capitalize(),
+	var people := String(meta.get("vernacular_label", String(meta.get("culture", "")).capitalize()))
+	_info.text = "%s%s%s %s village on %s · %s form · %d buildings (%d of %d extras placed) · seed %d" % [
+		title + "\n" if title != "" else "",
+		String(meta["name"]) + " — " if meta.has("name") else "", people,
 		meta.get("purpose", ""), meta.get("where", ""), meta.get("form", ""), rows.size(),
 		int(meta.get("extras_placed", 0)), int(meta.get("extras", 0)), v_seed]
+	if meta.get("vernacular_check") is Dictionary:
+		_info.text += "\n" + _vernacular_line(meta["vernacular_check"])
+	var stale := ""
 	if not baked.is_empty():
 		_info.text += "\nBaked %s at %s" % [String(meta.get("baked_at", "?")).substr(0, 16),
 			meta.get("commit", "?")]
-		if String(meta.get("commit", "")) != WalkVillage.git_head():
-			_info.text += " — HEAD is now %s: re-bake before trusting a pin" % WalkVillage.git_head()
+		stale = WalkVillage.stale_note(meta)
+	# A stale bake is said in red under the title and on the console. The grey
+	# "HEAD is now" line alone went unread for two weeks.
+	_village_meta["stale"] = stale
+	_stale_label.text = stale
+	_stale_label.visible = stale != ""
+	if stale != "":
+		push_warning("walk: " + stale)
 	_status.text = "%s in %.0f s. Double-click a building in the list to go to its door." % [
 		"Loaded the bake" if not baked.is_empty() else "Planned and built live",
 		(Time.get_ticks_msec() - t0) / 1000.0]
@@ -1063,6 +1129,7 @@ func _leave_village() -> void:
 	_terrain_name = ""
 	_village_list.visible = false
 	_village_label.visible = false
+	_stale_label.visible = false
 
 
 # --- village series -------------------------------------------------------
@@ -1664,6 +1731,10 @@ func _building_name() -> String:
 		return _building.name()
 	if _village_meta.is_empty():
 		return "Village on %s" % _terrain_name
+	if _village_meta.has("vernacular_label"):
+		return "%s, a %s %s village on %s" % [String(_village_meta.get("name", "")),
+			String(_village_meta["vernacular_label"]), _village_meta.get("purpose", ""),
+			_village_meta.get("where", "")]
 	return "%s %s village on %s" % [String(_village_meta.get("culture", "")).capitalize(),
 		_village_meta.get("purpose", ""), _village_meta.get("where", "")]
 
@@ -1682,8 +1753,12 @@ func _write_review() -> String:
 	var rows: Array = []
 	var md := PackedStringArray()
 	md.append("<!-- human-walk %s %s -->\n" % [id, req.kind])
+	# a vernacular village is its regions, not the default culture it carries
+	var style_word := String(req.style)
+	if _building == null and _village_meta.has("vernacular_label"):
+		style_word = String(_village_meta["vernacular_label"])
 	md.append("## Walk — %s: %s / %s, seed %d — %s\n\n" % [
-		String(req.kind).capitalize(), req.style, req.purpose, req.seed, stamp])
+		String(req.kind).capitalize(), style_word, req.purpose, req.seed, stamp])
 	md.append("Building: %s · cutaway: %s · solid furniture: %s\n\n" % [
 		_building_name(), "yes" if _cutaway.button_pressed else "no",
 		"yes" if _solid_props.button_pressed else "no"])
@@ -1696,6 +1771,9 @@ func _write_review() -> String:
 	if _series_name != "" and not _village.is_empty():
 		md.append("Village series: %s, village %d / %d — %s\n\n" % [_series_name, _series_i + 1,
 			_series.size(), String(_village.get("why", ""))])
+	if not _village.is_empty() and _village_meta.get("vernacular_check") is Dictionary:
+		md.append("Vernacular: %s — %s\n\n" % [String(_village_meta.get("vernacular_label", "")),
+			_vernacular_line(_village_meta["vernacular_check"])])
 	var flags := {}
 	for f in FIELDS:
 		flags[f] = (_checks[f] as CheckBox).button_pressed
@@ -1762,6 +1840,9 @@ func _write_review() -> String:
 			record["village_series"] = _series_name
 			record["stop"] = _series_i + 1
 			record["why"] = String(_village.get("why", ""))
+		if not _village.is_empty() and _village_meta.get("vernacular_check") is Dictionary:
+			record["vernacular_label"] = String(_village_meta.get("vernacular_label", ""))
+			record["vernacular_check"] = _village_meta["vernacular_check"]
 		err = _upsert_jsonl(jsonl, id, JSON.stringify(record))
 		if err != "":
 			return err

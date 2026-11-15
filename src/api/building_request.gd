@@ -78,6 +78,18 @@ var jank: float = 0.0
 ## rest on the walls and the table is put away. Left out of to_dict() at the
 ## default, so every request written before it is byte-identical.
 var period_seating: StringName = &"with_table"
+## VILLAGE-VERNACULAR (docs/VILLAGE_VERNACULAR.md). Houses and shops: a patch
+## over the style's own row (`HouseSpec.LOOK_KEYS` -- colours, roof form and
+## material, framing, shutters...); `HouseSpec.look_errors` says what a style
+## will take. Churches and castles: colours only (`wall`, `trim`, `roof`), laid
+## on the generated spec. Empty, the default, is the building as before, and
+## is left out of to_dict().
+var look: Dictionary = {}
+## Villages only: which regions of the vernacular dataset the village is built
+## from, and how they blend (`VillageVernacular.parse`). Either a plain
+## {region: weight} or {"blend": {region: weight}, "groups": {group: {region:
+## weight}}, "coherence": 0..1}. Empty, the default, is the culture alone.
+var vernacular: Dictionary = {}
 var _decode_errors: Array[Dictionary] = []
 
 const SCHEMA := "brickwild.request"
@@ -109,6 +121,10 @@ func to_dict() -> Dictionary:
 		out["jank"] = jank
 	if period_seating != &"with_table":
 		out["period_seating"] = String(period_seating)
+	if not look.is_empty():
+		out["look"] = _plain(look)
+	if not vernacular.is_empty():
+		out["vernacular"] = _plain(vernacular)
 	for field in PILE_FIELDS:
 		if float(get(field)) != 0.0:
 			out[field] = float(get(field))
@@ -171,6 +187,13 @@ static func from_dict(data: Dictionary) -> BuildingRequest:
 			out._decode_errors.append(_field_error(field, "must be a finite number"))
 		else:
 			out.set(field, float(value))
+	for field in ["look", "vernacular"]:
+		if not data.has(field):
+			continue
+		if data[field] is Dictionary:
+			out.set(field, (data[field] as Dictionary).duplicate(true))
+		else:
+			out._decode_errors.append(_field_error(field, "must be an object"))
 	var seed_value: Variant = data.get("seed", "0")
 	if seed_value is String and seed_value.is_valid_int() and str(int(seed_value)) == seed_value:
 		out.seed = int(seed_value)
@@ -181,6 +204,29 @@ static func from_dict(data: Dictionary) -> BuildingRequest:
 	else:
 		out._decode_errors.append(_field_error("seed", "must be a signed 64-bit decimal string or an exact JSON integer"))
 	return out
+
+
+## A Dictionary or Array with every StringName and Color made plain JSON text,
+## so a look written in GDScript and the same look read back from JSON are
+## the same document.
+static func _plain(v: Variant) -> Variant:
+	if v is Dictionary:
+		var d := {}
+		for k in v:
+			d[String(k)] = _plain(v[k])
+		return d
+	if v is Array:
+		var a := []
+		for e in v:
+			a.append(_plain(e))
+		return a
+	if v is StringName:
+		return String(v)
+	if v is Color:
+		return (v as Color).to_html(false)
+	if v is int:
+		return float(v)
+	return v
 
 
 static func _field_error(field: String, reason: String) -> Dictionary:
@@ -274,6 +320,8 @@ func copy() -> BuildingRequest:
 	out.orientation = orientation
 	out.period = period
 	out.jank = jank
+	out.look = look.duplicate(true)
+	out.vernacular = vernacular.duplicate(true)
 	out._decode_errors = _decode_errors.duplicate(true)
 	return out
 

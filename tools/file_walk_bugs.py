@@ -106,6 +106,17 @@ def describe(review, pin, shots_dir):
                      review["village_series"], review.get("why", "")))
     elif review.get("why"):
         lines.append("Tour stop: %s (%s)" % (review.get("stop", "?"), review["why"]))
+    # VILLAGE-VERNACULAR: which regions, and what the check said of the village
+    # when the human pinned it -- a pin the check passed is a gap in the dataset
+    # or its signature (docs/VILLAGE_VERNACULAR.md), not only in a builder
+    if review.get("vernacular_check"):
+        check = review["vernacular_check"]
+        verdict = ("ok; signature " + json.dumps(check.get("signature", {}), sort_keys=True)) \
+            if check.get("ok") else ("%s failures: %s" % (check.get("failure_count", "?"),
+                                                          "; ".join(check.get("failures", []))))
+        lines.append("Regions: %s (vernacular %s)" % (review.get("vernacular_label", "?"),
+                     json.dumps(review.get("request", {}).get("vernacular", {}), sort_keys=True)))
+        lines.append("VillageVernacularCheck when pinned: " + verdict)
     b = pin.get("building") or {}
     if b:
         lines.append("Building in the village: %s (lot %s), at %s in its own frame" % (

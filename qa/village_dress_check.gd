@@ -516,10 +516,11 @@ func _check_culture(plan: VillagePlan) -> void:
 	var slots: Array[String] = ["edge", "green", "hedge", "ground", "wild", "reed"]
 	if plan.spec.garden > 0.0:
 		slots.append_array(VillageDressCatalog.GARDEN.keys())
+	# a vernacular village plants its blend's palette (VILLAGE-VERNACULAR);
+	# every other village is held to its culture's, as before
+	var palette: Dictionary = VillageDressCatalog.palette_of(plan.spec) 		if plan.spec.feature_set() != null 		else VillageDressCatalog.PALETTES.get(plan.spec.culture, VillageDressCatalog.PALETTES[&"english"])
 	for slot in slots:
-		for key in VillageDressRules.palette_keys(
-				{"palette": VillageDressCatalog.PALETTES.get(plan.spec.culture,
-					VillageDressCatalog.PALETTES[&"english"])}, slot):
+		for key in VillageDressRules.palette_keys({"palette": palette}, slot):
 			allowed[key] = true
 	if allowed.is_empty():
 		return

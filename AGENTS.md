@@ -40,6 +40,11 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:api
 # for VoxelGames, and draw it; see docs/DUNGEONS.md
 godot --headless --path . --script res://tools/realise_dungeon.gd -- --plan plan.json --out rooms.json
 godot --headless --path . --script res://tools/draw_dungeon_sheet.gd -- --plan plan.json --out sheet.png
+# regional villages (Provence, Cyclades, Norse, Japanese) and their blends:
+# the dataset, the check and every house type built; see docs/VILLAGE_VERNACULAR.md
+godot --headless --path . --script res://tests/run_all.gd -- lane:vernacular
+# ...and photographed (not headless) -> artifacts/renders/vernacular/
+godot --path . --script res://tools/render_vernacular_villages.gd
 # the five windmills, every one of them, against WindmillCheck
 godot --headless --path . --script res://tests/run_all.gd -- lane:windmill
 # the slow gates that must pass before a merge, not per task (hours; background it)
@@ -145,6 +150,7 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | `VillageBridge`, a bridge on given ground, the ground's river (`VillageGroundWater`), `qa/village_bridge_check.gd` | `vcrossterrain`, then `tests/village_crossings_test.gd` as a script | ~40 s host, 24 checks; see docs/VILLAGE_TERRAIN.md |
 | stair streets, access flights, the 3D village walk: `VillageAccessSteps`, `VillageWalk3D`, `VillageWalk` on terrain | `vstepswalk`, then `vgroundterrain` | ~14 m loaded host, 91 checks (Manarola, Positano, Masouleh's stepped through road); see docs/VILLAGE_TERRAIN.md "Steps and the 3D walk" |
 | `VillageSiteAnalysis` (slope classes, landforms, drainage, contours, level regions) | `vanalysis` | ~15 s host, 47 checks; see docs/VILLAGE_TERRAIN.md |
+| the regional dataset `src/village/vernacular_regions.json`, `VillageVernacular` (blends), `VillageVernacularCheck`, a house/shop `look` (`HouseSpec.LOOK_KEYS`, `style_row()`) | `lane:vernacular` (`vvernacular`, then `vvernacularbuild`) | 210 s + 119 s host (15 Nov), 63 + 38 checks, three failing controls; see docs/VILLAGE_VERNACULAR.md |
 | the world settlement set, `tools/settlements/` | `vworld` | seconds; see docs/SETTLEMENT_TESTSET.md |
 | exhaustive castle sweep | `lane:castle` | scheduled; over 12 m for `caccess` alone |
 | the crooked warp: `core/haunt/crooked_warp.gd`, `qa/crooked_check.gd`, `BuildingRequest.jank` | `lane:haunt` | 5 m host, 2097 checks (26 Oct; every kind but hotel, plus a sloped and a pile house) |

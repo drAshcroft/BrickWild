@@ -65,6 +65,7 @@ const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props",
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
 const EXTRA: Array[String] = ["hslope", "hpiles", "hhousehold", "vwaterform", "library", "placement", "cultureapi", "compactapi", "vworld", "vrealism", "vterrain", "vterrainlane", "vcharacter", "vreal", "vshape", "vanalysis", "vground", "vgroundterrain", "vstepswalk", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
+	"vvernacular", "vvernacularbuild",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"crooked", "temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras",
 	"roofquick", "hblueprint", "houseqacore", "houseqaplan", "hmesh", "hammammesh", "nagaramesh", "stepwellmesh", "mountainmesh", "dravidamesh", "cridgeoccupancy", "metriccoords", "matkit", "churchaperture", "churchload", "churchchange", "sacredseq", "sacredid", "vis009", "vis010", "vis016", "catalogcache",
@@ -157,6 +158,9 @@ const LANES: Dictionary = {
 	# vtplan, vstepswalk, vterrain and vanalysis.
 	"lane:village-terrain": ["vterrainlane"],
 	"lane:village-appearance-fast": ["vdecoration", "vdecorationapi", "vappearance"],
+	# VILLAGE-VERNACULAR (docs/VILLAGE_VERNACULAR.md): the regional dataset, the
+	# blend and its check, then every house type and shop built and checked
+	"lane:vernacular": ["vvernacular", "vvernacularbuild"],
 	"lane:castle-change": ["ctowerhouse", "caperture", "cgatestairs", "castlechange", "cbergfried", "cidentity", "cwalkaccess", "cmotteaccess", "kwalk"],
 	"lane:motte-change": ["cmotteplan", "cmotteaccess", "coccupancy"],
 	"lane:castle-spot": ["castlechange", "chimeji"],
@@ -485,6 +489,10 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/village_quick_suite.gd").run()
 		"vcompact":
 			return preload("res://tests/suites/village_compact_suite.gd").run()
+		"vvernacular":
+			return preload("res://tests/suites/village_vernacular_suite.gd").run()
+		"vvernacularbuild":
+			return preload("res://tests/suites/village_vernacular_build_suite.gd").run()
 		"vworld":
 			return preload("res://tests/suites/village_world_sample_suite.gd").run()
 		"vrealism":

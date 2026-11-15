@@ -1,0 +1,384 @@
+{
+	"schema": "brickwild.vernacular",
+	"schema_version": 1,
+	"_about": "What is NORMAL for a village of each region, as distributions the generator draws from and the checks measure against. docs/VILLAGE_VERNACULAR.md is the field guide; VillageVernacular reads this file, VillageVernacularCheck judges a village by it. Colours are [hex, hex] lerp ends; every 'w' is a relative weight; 'tiers' are poor / middle / rich households.",
+	"regions": {
+		"provence": {
+			"label": "Provence (South of France)",
+			"summary": "Hill and plain villages of the Luberon and the Alpilles: rendered rubble and dry limestone in ochre, sand and rose, low canal-tile roofs, painted shutters on every window, tall narrow village houses packed round a Romanesque church, long low mas farmhouses outside.",
+			"culture": "mediterranean",
+			"aliases": ["provencal", "south_of_france", "french_south"],
+			"places": ["Gordes", "Roussillon", "Lourmarin", "Bonnieux", "Menerbes", "Lacoste", "Moustiers-Sainte-Marie", "Les Baux-de-Provence", "Saint-Paul-de-Vence"],
+			"sources": [
+				"Roussillon ochre quarries and the Conservatoire des ocres: the yellow-to-red ochre render of the Luberon villages",
+				"Parc naturel regional du Luberon, colour charts (nuanciers) for facades and shutters",
+				"Tuile canal (Roman barrel tile) roofs at roughly 25-35 percent slope, 14-19 degrees; genoise eaves rather than parapets",
+				"VillageRealLayout 'mediterranean' row (10 surveyed historic sites): median main building 81 m2, 57 percent touching a neighbour"
+			],
+			"signature": [
+				{"id": "warm_walls", "say": "walls in warm earth: ochre, sand, rose, cream or honey limestone", "measure": "walls", "clusters": ["ochre", "sand", "rose", "cream", "honey limestone", "red ochre"], "min": 0.9},
+				{"id": "tile_roofs", "say": "roofs of terracotta canal tile", "measure": "roof_material", "materials": ["tile"], "min": 0.9},
+				{"id": "pitched", "say": "low pitched roofs, never flat", "measure": "roof_form", "types": ["flat"], "max": 0.0},
+				{"id": "shutters", "say": "painted shutters on nearly every house", "measure": "shutters", "min": 0.8},
+				{"id": "tall_houses", "say": "many houses of two or three storeys", "measure": "storeys", "storeys": [2, 3], "min": 0.4},
+				{"id": "wall_variety", "say": "at least three wall colours in a village", "measure": "distinct", "group": "walls", "min": 3},
+				{"id": "shutter_variety", "say": "at least four shutter colours in a village", "measure": "distinct", "group": "trim", "min": 4},
+				{"id": "church", "say": "a Romanesque church", "measure": "landmark", "church": "romanesque"}
+			],
+			"wealth": {"rich": 0.15, "poor": 0.3, "weathering": {"poor": 0.22, "middle": 0.09, "rich": 0.0}},
+			"size": {"area_scale": 1.0},
+			"walls": [
+				{"name": "ochre", "w": 0.3, "hex": ["dcab62", "c9924a"]},
+				{"name": "sand", "w": 0.24, "hex": ["e8d1a4", "d6bb88"]},
+				{"name": "rose", "w": 0.12, "hex": ["e5b6a2", "d29a84"]},
+				{"name": "cream", "w": 0.14, "hex": ["f0e4cc", "e3d4b4"]},
+				{"name": "honey limestone", "w": 0.14, "hex": ["d9c59e", "c5ad82"]},
+				{"name": "red ochre", "w": 0.06, "hex": ["c8764e", "ae5f3e"]}
+			],
+			"trim": [
+				{"name": "lavender blue", "w": 0.22, "hex": ["8e9bc6", "7987b5"]},
+				{"name": "provence blue", "w": 0.14, "hex": ["4f80aa", "3e6a92"]},
+				{"name": "sage green", "w": 0.2, "hex": ["9fb59b", "86a283"]},
+				{"name": "olive green", "w": 0.12, "hex": ["717c4b", "5e683d"]},
+				{"name": "pale grey", "w": 0.12, "hex": ["bcc0ba", "a6aba5"]},
+				{"name": "bordeaux", "w": 0.08, "hex": ["7f2f35", "68252b"]},
+				{"name": "turquoise", "w": 0.04, "hex": ["62a6a2", "4d8f8b"]},
+				{"name": "weathered wood", "w": 0.08, "hex": ["8c7154", "705842"]}
+			],
+			"roofs": {
+				"canal tile": {"w": 1.0, "types": {"gable": 0.7, "hipped": 0.3}, "pitch": [0.3, 0.42], "material": "tile",
+					"colours": [
+						{"name": "fired terracotta", "w": 0.45, "hex": ["c26c40", "ab5a34"]},
+						{"name": "old tile", "w": 0.35, "hex": ["aa694c", "8e5642"]},
+						{"name": "lichen tile", "w": 0.2, "hex": ["b59174", "9a785e"]}
+					]}
+			},
+			"houses": {
+				"maison de village": {"label": "village house: tall, narrow, rendered", "style": "townhouse",
+					"tiers": {"poor": 0.6, "middle": 0.5, "rich": 0.2}, "purposes": {"market": 1.5, "crossroads": 1.3, "pilgrim": 1.3, "farming": 0.7},
+					"storeys": {"2": 0.6, "3": 0.4}, "area": 0.8, "roofs": ["canal tile"],
+					"look": {"timber": 0.0, "jetty": 0.0, "dormers": 0.0, "bargeboards": 0.0, "stone_ground": 0.0,
+						"shutters": 1.0, "porch": 0.1, "chimney": 0.7}},
+				"maison provencale": {"label": "rendered house with a loggia or a vine arbour", "style": "mediterranean",
+					"tiers": {"poor": 0.3, "middle": 0.5, "rich": 0.2},
+					"storeys": {"1": 0.3, "2": 0.7}, "area": 1.0, "roofs": ["canal tile"],
+					"look": {"parapet": 0.0, "veranda": 0.2, "shutters": 1.0, "chimney": 0.6}},
+				"mas": {"label": "mas: the long low farmhouse", "style": "farmhouse",
+					"tiers": {"poor": 0.2, "middle": 0.4, "rich": 0.3}, "purposes": {"farming": 2.0, "mill": 1.5, "forest": 1.5, "market": 0.4},
+					"trades": {"farmer": 2.0},
+					"storeys": {"1": 0.45, "2": 0.55}, "area": 1.15, "roofs": ["canal tile"],
+					"look": {"timber": 0.0, "jetty": 0.0, "dormers": 0.0, "bargeboards": 0.0, "stone_ground": 0.0,
+						"shutters": 1.0, "porch": 0.3, "chimney": 0.8}},
+				"bastide": {"label": "bastide: the square house of the well-off, under a hipped roof", "style": "mediterranean",
+					"tiers": {"middle": 0.05, "rich": 1.0},
+					"storeys": {"2": 0.6, "3": 0.4}, "area": 1.35, "roofs": ["canal tile"], "roof_types": {"hipped": 1.0},
+					"look": {"parapet": 0.0, "veranda": 0.0, "shutters": 1.0, "chimney": 1.0}}
+			},
+			"shop": "maison de village",
+			"landmark": {"church": "romanesque", "look": {"wall": ["d8c49e", "c6ae86"], "roof": ["b0664a", "97553e"]}},
+			"plants": {
+				"edge": ["Wild_CommonTree_*"],
+				"green": ["Wild_CommonTree_*"],
+				"hedge": ["Nature_Bush_Small_Flowers", "Wild_Bush_Common_Flowers", "Nature_Bush_Small"],
+				"ground": ["Wild_Grass_Wispy_Short", "Wild_Pebble_Round_*", "Nature_Flower_*_Clump"],
+				"wild": ["Nature_DeadTree_1"]
+			},
+			"ground": {"ground": "9f9a68", "road": "c8ae84", "common": "c2aa80", "verge": "8f9058", "yard": "b8a07a", "field": "a58d58", "wear": "b9a27c", "tread": "cfb48c"},
+			"names": {"roots": ["Bon", "Lour", "Men", "Gor", "Cade", "Vau", "Sail", "Roque", "Mira", "Cab", "Lacos", "Oppe"],
+				"endings": ["ieux", "marin", "erbes", "des", "net", "gues", "ane", "brune", "val", "rieres", "te", "de"],
+				"patterns": ["{root}{ending}", "{root}{ending}", "Saint-{root}{ending}", "La Roque-{root}{ending}"]}
+		},
+		"cyclades": {
+			"label": "Cyclades (Greek island)",
+			"summary": "Aegean island villages: whitewashed cubic houses under flat lime roofs, doors and shutters painted blue, green or oxblood, packed along stepped white-lined lanes round a white chapel with a blue dome; a few neoclassical captains' houses under tile.",
+			"culture": "mediterranean",
+			"aliases": ["greek", "greece", "aegean"],
+			"places": ["Oia (Santorini)", "Chora (Mykonos)", "Naoussa (Paros)", "Lefkes (Paros)", "Chora (Folegandros)", "Plaka (Milos)", "Apollonia (Sifnos)"],
+			"sources": [
+				"The island building codes of the Cyclades (Mykonos, Santorini and others) that keep walls whitewashed and openings painted",
+				"The flat dried-earth and lime roof (doma) of the Cycladic house, laid on timber beams behind a low parapet",
+				"Neoclassical captains' houses of Syros, Andros and Hydra: two storeys, hipped tile roofs, pastel render",
+				"VillageRealLayout 'mediterranean' row (10 surveyed historic sites): 57 percent of buildings touch a neighbour"
+			],
+			"signature": [
+				{"id": "white_walls", "say": "walls whitewashed with lime", "measure": "walls", "clusters": ["lime white"], "min": 0.55},
+				{"id": "flat_roofs", "say": "flat roofs behind a parapet", "measure": "roof_form", "types": ["flat"], "min": 0.6},
+				{"id": "blue_openings", "say": "doors and shutters mostly blue", "measure": "trim", "clusters": ["aegean blue", "sky blue"], "min": 0.3},
+				{"id": "low", "say": "one or two storeys, never three", "measure": "storeys", "storeys": [3], "max": 0.0},
+				{"id": "no_northern_roofs", "say": "no thatch, slate or shingle", "measure": "roof_material", "materials": ["thatch", "slate", "shingle"], "max": 0.0},
+				{"id": "opening_variety", "say": "at least three colours of door and shutter", "measure": "distinct", "group": "trim", "min": 3},
+				{"id": "church", "say": "a domed Byzantine chapel", "measure": "landmark", "church": "byzantine"}
+			],
+			"wealth": {"rich": 0.1, "poor": 0.35, "weathering": {"poor": 0.1, "middle": 0.03, "rich": 0.0}},
+			"size": {"area_scale": 0.85},
+			"walls": [
+				{"name": "lime white", "w": 0.86, "hex": ["f7f6f1", "ecebe4"]},
+				{"name": "warm white", "w": 0.06, "hex": ["f2ebd9", "e8ddc5"]},
+				{"name": "pastel ochre", "w": 0.03, "hex": ["ebca8c", "deb773"]},
+				{"name": "pastel pink", "w": 0.025, "hex": ["efcdc1", "e2b3a4"]},
+				{"name": "pale blue", "w": 0.025, "hex": ["cadce7", "b5cbd9"]}
+			],
+			"trim": [
+				{"name": "aegean blue", "w": 0.5, "hex": ["2160aa", "1a4d8c"]},
+				{"name": "sky blue", "w": 0.12, "hex": ["5092d0", "3f7cb7"]},
+				{"name": "sea green", "w": 0.12, "hex": ["2f7e6e", "266659"]},
+				{"name": "oxblood", "w": 0.1, "hex": ["8c2c26", "72231e"]},
+				{"name": "yellow", "w": 0.06, "hex": ["e2b63e", "c99f30"]},
+				{"name": "grey blue", "w": 0.1, "hex": ["7e90a4", "68798e"]}
+			],
+			"roofs": {
+				"flat lime": {"w": 0.85, "types": {"flat": 1.0}, "pitch": [0.0, 0.0], "material": "earth", "eave": [0.15, 0.15],
+					"colours": [{"name": "lime", "w": 1.0, "hex": ["f4f3ee", "e7e5dd"]}]},
+				"neoclassical tile": {"w": 0.15, "types": {"hipped": 0.8, "gable": 0.2}, "pitch": [0.32, 0.44], "material": "tile",
+					"colours": [{"name": "terracotta", "w": 1.0, "hex": ["ba663e", "9e5534"]}]}
+			},
+			"houses": {
+				"cube": {"label": "the Cycladic house: a whitewashed cube", "style": "mediterranean",
+					"tiers": {"poor": 1.0, "middle": 0.7, "rich": 0.2},
+					"storeys": {"1": 0.65, "2": 0.35}, "area": 0.75, "roofs": ["flat lime"],
+					"look": {"parapet": 1.0, "veranda": 0.0, "chimney": 0.35, "shutters": 0.85}},
+				"terrace cube": {"label": "a cube with a shaded terrace on its front", "style": "mediterranean",
+					"tiers": {"poor": 0.15, "middle": 0.3, "rich": 0.2},
+					"storeys": {"1": 0.5, "2": 0.5}, "area": 0.85, "roofs": ["flat lime"],
+					"look": {"parapet": 1.0, "veranda": 1.0, "chimney": 0.3, "shutters": 0.85}},
+				"captain's house": {"label": "a neoclassical captain's house under tile", "style": "mediterranean",
+					"tiers": {"middle": 0.05, "rich": 0.6},
+					"storeys": {"2": 1.0}, "area": 1.3, "roofs": ["neoclassical tile"],
+					"walls": [
+						{"name": "lime white", "w": 0.5, "hex": ["f7f6f1", "ecebe4"]},
+						{"name": "pastel ochre", "w": 0.25, "hex": ["ebca8c", "deb773"]},
+						{"name": "pastel pink", "w": 0.25, "hex": ["efcdc1", "e2b3a4"]}
+					],
+					"look": {"parapet": 0.0, "veranda": 0.0, "shutters": 1.0, "chimney": 0.6}}
+			},
+			"shop": "cube",
+			"landmark": {"church": "byzantine", "look": {"wall": ["f7f6f1", "ecebe4"], "trim": ["f2f0ea", "e6e3da"], "roof": ["2a63aa", "1f5191"]}},
+			"plants": {
+				"edge": ["Wild_CommonTree_*"],
+				"green": ["Wild_CommonTree_*"],
+				"hedge": ["Wild_Plant_1*", "Wild_Plant_7*", "Nature_Bush_Small_Flowers"],
+				"ground": ["Wild_Pebble_Square_*", "Wild_Rock_Medium_*", "Wild_Grass_Wispy_Short"],
+				"wild": ["Nature_DeadTree_1"]
+			},
+			"ground": {"ground": "b2a685", "road": "cfccc2", "common": "d9d5ca", "verge": "a69c78", "yard": "d3cec1", "field": "ae9a6a", "wear": "bfb9aa", "tread": "dedad0"},
+			"names": {"roots": ["Lef", "Nao", "Pyr", "Apol", "Kast", "Chor", "Emb", "Mar", "Kam", "Ol", "Pla", "Sif"],
+				"endings": ["kes", "ussa", "gos", "lonia", "ro", "a", "orio", "pissa", "ari", "ymbos", "ka", "nos"],
+				"patterns": ["{root}{ending}", "{root}{ending}", "Ano {root}{ending}", "Kato {root}{ending}"]}
+		},
+		"norse": {
+			"label": "Norse (Scandinavian farm village)",
+			"summary": "Farms of the fjords and the Icelandic and Norwegian valleys: long timber houses with stave walls darkened by tar, log houses painted falu red or ochre with white trim, roofs of living turf, straw or tarred shingle, detached on green ground among birch and pine, round a stave church.",
+			"culture": "norse",
+			"aliases": ["viking", "scandinavian", "nordic"],
+			"places": ["Borg (Lofotr, Vestvagoy)", "Stong and Thjodveldisbaerinn (Iceland)", "Glaumbaer turf farm (Iceland)", "Heddal and Borgund stave churches", "Maihaugen (Lillehammer)", "Trelleborg and Fyrkat longhouses (Denmark)"],
+			"sources": [
+				"Viking-age longhouses: aisled timber halls 15-50 m long and 5-8 m wide, one storey, with a central hearth and smoke hole",
+				"Turf (torv) roofs on birch bark over boards in Norway and Iceland, laid at about 22-30 degrees",
+				"Falu red (from the Falun copper mine) and yellow ochre paints on Scandinavian log houses; tar on stave walls and shingles",
+				"VillageRealLayout 'norse' row (4 surveyed sites): only 24 percent of buildings touch, median gap 3.5 m"
+			],
+			"signature": [
+				{"id": "timber_walls", "say": "walls of tarred or weathered timber, or painted falu red or ochre", "measure": "walls", "clusters": ["tar black", "weathered timber", "dark brown timber", "falu red", "ochre yellow"], "min": 0.9},
+				{"id": "turf", "say": "turf roofs are the common roof", "measure": "roof_material", "materials": ["earth"], "min": 0.3},
+				{"id": "no_tile", "say": "no tile and no flat roofs", "measure": "roof_material", "materials": ["tile"], "max": 0.0},
+				{"id": "not_flat", "say": "no flat roofs", "measure": "roof_form", "types": ["flat"], "max": 0.0},
+				{"id": "low", "say": "mostly one storey", "measure": "storeys", "storeys": [1], "min": 0.55},
+				{"id": "longhouses", "say": "longhouses among the houses", "measure": "styles", "styles": ["longhall"], "min": 0.15},
+				{"id": "wall_variety", "say": "at least three wall finishes", "measure": "distinct", "group": "walls", "min": 3},
+				{"id": "church", "say": "a stave church", "measure": "landmark", "church": "nordic_stave"}
+			],
+			"wealth": {"rich": 0.12, "poor": 0.35, "weathering": {"poor": 0.25, "middle": 0.12, "rich": 0.04}},
+			"size": {"area_scale": 1.0},
+			"walls": [
+				{"name": "tar black", "w": 0.25, "hex": ["3d3129", "2e251f"]},
+				{"name": "weathered timber", "w": 0.25, "hex": ["716557", "5c5247"]},
+				{"name": "dark brown timber", "w": 0.2, "hex": ["5c4532", "48372b"]},
+				{"name": "falu red", "w": 0.2, "hex": ["8e3024", "76271d"]},
+				{"name": "ochre yellow", "w": 0.1, "hex": ["c69c4c", "ae873d"]}
+			],
+			"trim": [
+				{"name": "white", "w": 0.35, "hex": ["efebe1", "dedacd"]},
+				{"name": "tar", "w": 0.4, "hex": ["2b221c", "1f1915"]},
+				{"name": "dark green", "w": 0.1, "hex": ["304b36", "273e2c"]},
+				{"name": "blue grey", "w": 0.15, "hex": ["5d707e", "4d5e6a"]}
+			],
+			"roofs": {
+				"turf": {"w": 0.62, "types": {"gable": 1.0}, "pitch": [0.45, 0.62], "material": "earth",
+					"colours": [
+						{"name": "summer turf", "w": 0.6, "hex": ["607b3b", "4f6931"]},
+						{"name": "dry turf", "w": 0.25, "hex": ["7e7b46", "6a673b"]},
+						{"name": "moss turf", "w": 0.15, "hex": ["4b5b36", "3e4b2d"]}
+					]},
+				"straw thatch": {"w": 0.08, "types": {"gable": 0.6, "half_hipped": 0.4}, "pitch": [0.85, 1.15], "material": "thatch",
+					"colours": [
+						{"name": "straw", "w": 0.6, "hex": ["a28e5e", "8c794e"]},
+						{"name": "old straw", "w": 0.4, "hex": ["7f6e4a", "6b5c3e"]}
+					]},
+				"tarred shingle": {"w": 0.3, "types": {"gable": 1.0}, "pitch": [0.75, 1.1], "material": "shingle",
+					"colours": [
+						{"name": "tarred shingle", "w": 0.6, "hex": ["3e332b", "2f2721"]},
+						{"name": "silver shingle", "w": 0.4, "hex": ["6f6b63", "5b5851"]}
+					]}
+			},
+			"houses": {
+				"longhouse": {"label": "the longhouse: stave walls under one long roof", "style": "longhall",
+					"tiers": {"poor": 0.3, "middle": 0.7, "rich": 0.5},
+					"storeys": {"1": 1.0}, "area": 1.2, "roofs": ["turf", "straw thatch", "tarred shingle"],
+					"walls": [
+						{"name": "tar black", "w": 0.4, "hex": ["3d3129", "2e251f"]},
+						{"name": "weathered timber", "w": 0.35, "hex": ["716557", "5c5247"]},
+						{"name": "dark brown timber", "w": 0.25, "hex": ["5c4532", "48372b"]}
+					],
+					"trim": [
+						{"name": "tar", "w": 0.7, "hex": ["2b221c", "1f1915"]},
+						{"name": "dark brown timber", "w": 0.3, "hex": ["5c4532", "48372b"]}
+					],
+					"look": {"timber": 1.0, "framing": ["close_studding"], "studs": [0.34, 0.48], "braces": 0.0, "rail": 0.0,
+						"jetty": 0.0, "dormers": 0.0, "stone_ground": 0.0, "shutters": 0.2, "bargeboards": 1.0, "chimney": 0.25, "chimney_style": "straight", "porch": 0.35}},
+				"stue": {"label": "the log house, painted, with white trim", "style": "cottage",
+					"tiers": {"poor": 0.6, "middle": 0.4, "rich": 0.2},
+					"storeys": {"1": 0.75, "2": 0.25}, "area": 0.85, "roofs": ["turf", "tarred shingle"],
+					"walls": [
+						{"name": "falu red", "w": 0.5, "hex": ["8e3024", "76271d"]},
+						{"name": "ochre yellow", "w": 0.2, "hex": ["c69c4c", "ae873d"]},
+						{"name": "tar black", "w": 0.3, "hex": ["3d3129", "2e251f"]}
+					],
+					"trim": [
+						{"name": "white", "w": 0.7, "hex": ["efebe1", "dedacd"]},
+						{"name": "dark green", "w": 0.15, "hex": ["304b36", "273e2c"]},
+						{"name": "tar", "w": 0.15, "hex": ["2b221c", "1f1915"]}
+					],
+					"look": {"timber": 0.0, "jetty": 0.0, "dormers": 0.1, "stone_ground": 0.0, "shutters": 0.3, "bargeboards": 1.0, "porch": 0.3, "chimney": 0.6, "chimney_style": "straight"}},
+				"hall": {"label": "the chieftain's hall", "style": "longhall",
+					"tiers": {"rich": 0.5},
+					"storeys": {"1": 1.0}, "area": 1.6, "roofs": ["tarred shingle", "turf"],
+					"walls": [
+						{"name": "tar black", "w": 0.6, "hex": ["3d3129", "2e251f"]},
+						{"name": "dark brown timber", "w": 0.4, "hex": ["5c4532", "48372b"]}
+					],
+					"trim": [{"name": "tar", "w": 1.0, "hex": ["2b221c", "1f1915"]}],
+					"look": {"timber": 1.0, "framing": ["close_studding"], "studs": [0.32, 0.42], "braces": 0.0, "rail": 0.0,
+						"jetty": 0.0, "dormers": 0.0, "stone_ground": 0.0, "shutters": 0.2, "bargeboards": 1.0, "chimney": 0.5, "chimney_style": "straight", "porch": 0.4}},
+				"loft": {"label": "the loft house: an upper storey jettied out over the lower", "style": "cottage",
+					"tiers": {"middle": 0.1, "rich": 0.2},
+					"storeys": {"2": 1.0}, "area": 0.9, "roofs": ["turf", "tarred shingle"],
+					"walls": [
+						{"name": "dark brown timber", "w": 0.5, "hex": ["5c4532", "48372b"]},
+						{"name": "weathered timber", "w": 0.5, "hex": ["716557", "5c5247"]}
+					],
+					"look": {"timber": 0.0, "jetty": 1.0, "dormers": 0.0, "stone_ground": 0.0, "shutters": 0.2, "bargeboards": 1.0, "porch": 0.2, "chimney": 0.5, "chimney_style": "straight"}}
+			},
+			"shop": "stue",
+			"landmark": {"church": "nordic_stave", "look": {"wall": ["4b3b2d", "3b2f25"], "trim": ["2b221c", "1f1915"], "roof": ["3b3029", "2d251f"]}},
+			"plants": {
+				"edge": ["Wild_Pine_*", "Nature_BirchTree_*"],
+				"green": ["Nature_BirchTree_*"],
+				"hedge": ["Nature_Bush_Small", "Nature_Bush"],
+				"ground": ["Wild_Grass_Wispy_*", "Wild_Rock_Medium_*", "Wild_Fern_1"],
+				"wild": ["Nature_DeadTree_1", "Nature_DeadTree_2"]
+			},
+			"ground": {"ground": "5e7043", "road": "7c6b52", "common": "6c8a48", "verge": "5c7a3f", "yard": "72664a", "field": "7a7a49", "wear": "786950", "tread": "8a7a5c"},
+			"names": {"roots": ["Hrafn", "Ulf", "Sval", "Eid", "Bjorn", "Skog", "Fjar", "Heg", "Vik", "Thor", "Aud", "Sig"],
+				"endings": ["heim", "vik", "by", "stad", "dal", "nes", "fjord", "holt", "gard", "oy", "set", "bo"],
+				"patterns": ["{root}{ending}"]}
+		},
+		"japanese": {
+			"label": "Japanese (rural village and post town)",
+			"summary": "Farming villages and post towns of the Edo period: dark timber frames filled with white lime or earth plaster, raised floors with an engawa and lattice screens, irimoya roofs of grey kawara tile or deep straw thatch, detached in their plots along gravel lanes, among pine and maple.",
+			"culture": "east_asian",
+			"aliases": ["japan", "nihon"],
+			"places": ["Ouchi-juku (Fukushima)", "Tsumago-juku and Magome-juku (Kiso valley)", "Miyama Kayabuki-no-sato (Kyoto)", "Kurashiki Bikan (Okayama)", "Shirakawa-go (Gifu)"],
+			"sources": [
+				"Minka: the farmhouse of timber posts and beams, earthen or lime (shikkui) plaster walls, raised wooden floor and engawa",
+				"Kayabuki (miscanthus thatch) on farmhouses, 45 degrees and steeper; ibushi kawara tile, silver-grey, on town houses and the houses of headmen",
+				"Machiya: the two-storey town house of the post towns, narrow to the street, dark lattice front",
+				"VillageRealLayout 'east_asian' row: 29 percent touching, median gap 2.2 m -- houses stand in their own plots"
+			],
+			"signature": [
+				{"id": "irimoya", "say": "hip-and-gable (irimoya) roofs", "measure": "roof_form", "types": ["irimoya"], "min": 0.9},
+				{"id": "tile", "say": "grey kawara tile on a good share of roofs", "measure": "roof_material", "materials": ["tile"], "min": 0.3},
+				{"id": "thatch", "say": "straw thatch on the farmhouses", "measure": "roof_material", "materials": ["thatch"], "min": 0.08},
+				{"id": "plaster_walls", "say": "walls of white lime, earth plaster or dark timber, never painted colours", "measure": "walls", "clusters": ["white shikkui", "earth plaster", "dark timber", "pale clay"], "min": 0.9},
+				{"id": "dark_frames", "say": "dark timber frames and lattices", "measure": "trim", "clusters": ["near-black timber", "dark brown timber", "weathered cedar"], "min": 0.85},
+				{"id": "minka", "say": "the minka is every house", "measure": "styles", "styles": ["asian"], "min": 0.9},
+				{"id": "low", "say": "mostly one storey", "measure": "storeys", "storeys": [1], "min": 0.6}
+			],
+			"wealth": {"rich": 0.12, "poor": 0.35, "weathering": {"poor": 0.2, "middle": 0.08, "rich": 0.0}},
+			"size": {"area_scale": 1.0},
+			"walls": [
+				{"name": "white shikkui", "w": 0.35, "hex": ["ede9dd", "e0dacb"]},
+				{"name": "earth plaster", "w": 0.3, "hex": ["cab48d", "b59e77"]},
+				{"name": "dark timber", "w": 0.25, "hex": ["4b3b2d", "3b2e23"]},
+				{"name": "pale clay", "w": 0.1, "hex": ["d9cdb1", "c9bba1"]}
+			],
+			"trim": [
+				{"name": "near-black timber", "w": 0.5, "hex": ["2f2721", "241e19"]},
+				{"name": "dark brown timber", "w": 0.35, "hex": ["503b29", "402f21"]},
+				{"name": "weathered cedar", "w": 0.15, "hex": ["7b6751", "675544"]}
+			],
+			"roofs": {
+				"kawara tile": {"w": 0.6, "types": {"irimoya": 1.0}, "pitch": [0.72, 0.88], "material": "tile",
+					"colours": [
+						{"name": "ibushi grey", "w": 0.6, "hex": ["5c6267", "4b5156"]},
+						{"name": "blue-black tile", "w": 0.3, "hex": ["3d444b", "31373d"]},
+						{"name": "brown tile", "w": 0.1, "hex": ["5f4d41", "4e3f35"]}
+					]},
+				"kayabuki": {"w": 0.4, "types": {"irimoya": 1.0}, "pitch": [0.88, 1.0], "material": "thatch",
+					"colours": [
+						{"name": "miscanthus", "w": 0.6, "hex": ["907b53", "7b6846"]},
+						{"name": "old thatch", "w": 0.4, "hex": ["706351", "5e5345"]}
+					]}
+			},
+			"houses": {
+				"minka": {"label": "the minka: the farmhouse", "style": "asian",
+					"tiers": {"poor": 0.5, "middle": 0.6, "rich": 0.3}, "purposes": {"farming": 1.6, "forest": 1.4, "market": 0.6},
+					"trades": {"farmer": 1.5},
+					"storeys": {"1": 1.0}, "area": 1.1, "roofs": ["kayabuki", "kawara tile"],
+					"walls": [
+						{"name": "earth plaster", "w": 0.45, "hex": ["cab48d", "b59e77"]},
+						{"name": "white shikkui", "w": 0.25, "hex": ["ede9dd", "e0dacb"]},
+						{"name": "dark timber", "w": 0.3, "hex": ["4b3b2d", "3b2e23"]}
+					],
+					"look": {"framing": ["square_panel"], "braces": 0.0}},
+				"noka": {"label": "the small thatched farmhouse", "style": "asian",
+					"tiers": {"poor": 0.5, "middle": 0.15},
+					"storeys": {"1": 1.0}, "area": 0.8, "roofs": ["kayabuki"],
+					"walls": [
+						{"name": "earth plaster", "w": 0.6, "hex": ["cab48d", "b59e77"]},
+						{"name": "pale clay", "w": 0.4, "hex": ["d9cdb1", "c9bba1"]}
+					],
+					"look": {"framing": ["square_panel"], "braces": 0.0}},
+				"machiya": {"label": "the machiya: the town house of the post road", "style": "asian",
+					"tiers": {"poor": 0.1, "middle": 0.25, "rich": 0.3}, "purposes": {"market": 2.0, "crossroads": 1.8, "pilgrim": 1.5, "farming": 0.4},
+					"storeys": {"1": 0.4, "2": 0.6}, "area": 0.95, "roofs": ["kawara tile"],
+					"walls": [
+						{"name": "dark timber", "w": 0.75, "hex": ["4b3b2d", "3b2e23"]},
+						{"name": "white shikkui", "w": 0.25, "hex": ["ede9dd", "e0dacb"]}
+					],
+					"look": {"framing": ["square_panel"], "braces": 0.0}},
+				"shoya": {"label": "the shoya: the headman's house, under tile", "style": "asian",
+					"tiers": {"rich": 0.4},
+					"storeys": {"1": 1.0}, "area": 1.5, "roofs": ["kawara tile"],
+					"walls": [
+						{"name": "white shikkui", "w": 0.6, "hex": ["ede9dd", "e0dacb"]},
+						{"name": "dark timber", "w": 0.4, "hex": ["4b3b2d", "3b2e23"]}
+					],
+					"look": {"framing": ["square_panel"], "braces": 0.0}}
+			},
+			"shop": "machiya",
+			"landmark": {"church": "nordic_stave", "fallback": true, "wants": "a temple hall (hondo) or a shrine with its torii; BrickWild has no Japanese sacred building at village scale yet, so the dark timber stave church under a grey roof stands in",
+				"look": {"wall": ["4b3b2d", "3b2e23"], "trim": ["2f2721", "241e19"], "roof": ["555b60", "464c51"]}},
+			"plants": {
+				"edge": ["Wild_Pine_*", "Nature_MapleTree_*"],
+				"green": ["Nature_MapleTree_*"],
+				"hedge": ["Nature_Bush_Small", "Wild_Bush_Common"],
+				"ground": ["Wild_Pebble_Round_*", "Wild_Fern_1", "Wild_Grass_Common_Short"],
+				"wild": ["Nature_DeadTree_1"]
+			},
+			"ground": {"ground": "687346", "road": "b2a995", "common": "c3baa5", "verge": "62744a", "yard": "a89e88", "field": "7d8a4b", "wear": "9b907a", "tread": "beb5a1"},
+			"names": {"roots": ["O", "Tsu", "Maga", "Shira", "Kura", "Mi", "Na", "Kiso", "Hara", "Ta", "Yama", "Kawa"],
+				"endings": ["uchi", "mago", "me", "kawa", "shiki", "yama", "gura", "zawa", "no", "saki", "mura", "hara"],
+				"patterns": ["{root}{ending}", "{root}{ending}-juku", "{root}{ending}-mura"]}
+		}
+	}
+}

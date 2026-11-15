@@ -341,6 +341,12 @@ static func describe(kind: StringName) -> Dictionary:
 		out["upkeep"] = {"min": 0.0, "max": 1.0, "step": 0.05,
 			"value": 1.0, "label": "Upkeep",
 			"min_label": "Worn / slum", "max_label": "Clean"}
+		# VILLAGE-VERNACULAR: the regions a `vernacular` blend may name, the
+		# groups it may weight one by one, and what each region is held to
+		out["vernacular"] = {"label": "Regional character", "default": {},
+			"regions": VillageVernacular.describe(), "groups": VillageVernacular.GROUPS,
+			"coherence": {"min": 0.0, "max": 1.0, "value": 0.0,
+				"min_label": "One hybrid people", "max_label": "Peoples side by side"}}
 	if kind == &"world":
 		# a world family narrows the kind's envelope with its own, so the
 		# families are published with theirs attached
@@ -430,11 +436,46 @@ static func validate(request: BuildingRequest) -> Array[Dictionary]:
 	elif request.period_seating != HouseSpec.SEATING_WITH_TABLE and request.kind != &"house":
 		out.append(_error(&"unsupported_option", &"period_seating",
 			"period_seating is only available for houses."))
+	_validate_look(request, out)
 	if request.kind == &"world" and out.is_empty():
 		# a world family narrows the kind's envelope with its own, and owns
 		# which sub-kinds it comes in
 		out.append_array(validate_world_envelope(request))
 	return out
+
+
+## VILLAGE-VERNACULAR (docs/VILLAGE_VERNACULAR.md). A house or shop look is a
+## patch over its style row and says itself what is wrong with it; a church or
+## castle takes colours only; no other kind takes one. `vernacular` is a
+## village's alone, and VillageVernacular.parse judges it.
+static func _validate_look(request: BuildingRequest, out: Array[Dictionary]) -> void:
+	if not request.look.is_empty():
+		if request.kind in [&"house", &"shop"]:
+			for why in HouseSpec.look_errors(request.style, request.look):
+				out.append(_error(&"invalid_look", &"look", why + "."))
+		elif request.kind in [&"church", &"castle"]:
+			for key in request.look:
+				if not BuildingFamilyAdapter.LOOK_COLOUR_FIELDS.has(String(key)):
+					out.append(_error(&"invalid_look", &"look",
+						"A %s look takes colours only (wall, trim, roof), not '%s'." % [
+							String(request.kind), String(key)]))
+			var colours := request.look.duplicate()
+			for key in request.look:
+				if not BuildingFamilyAdapter.LOOK_COLOUR_FIELDS.has(String(key)):
+					colours.erase(key)
+			for why in HouseSpec.look_errors(&"cottage", colours):
+				out.append(_error(&"invalid_look", &"look", why + "."))
+		else:
+			out.append(_error(&"unsupported_option", &"look",
+				"look is only available for houses, shops, churches and castles."))
+	if not request.vernacular.is_empty():
+		if request.kind != &"village":
+			out.append(_error(&"unsupported_option", &"vernacular",
+				"vernacular is only available for villages."))
+		else:
+			var parsed: Dictionary = VillageVernacular.parse(request.vernacular)
+			for why in parsed["errors"]:
+				out.append(_error(&"invalid_vernacular", &"vernacular", String(why) + "."))
 
 
 ## Falling ground (VTER-HOUSE-SLOPE). A house or shop stands on up to two
