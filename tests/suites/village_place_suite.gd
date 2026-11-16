@@ -454,6 +454,29 @@ static func _settings(res: SuiteResult) -> void:
 	# a wall wants the people to man it
 	_ok(res, _spec("desert_oasis").enclosure == &"palisade" and _spec("desert_oasis", 0.4, 200).enclosure == &"wall",
 		"desert_oasis: enclosure %s at 40 people, %s at 200" % [_spec("desert_oasis").enclosure, _spec("desert_oasis", 0.4, 200).enclosure])
+	# ...the civic people man it (60 shown, 5000 implied), and a garrison at any size
+	var implied := VillageSpec.new(SEED)
+	implied.population = 60
+	implied.implied_population = 5000
+	implied.vernacular = {"place": {"like": "desert_oasis"}}
+	VillagePlace.apply(implied)
+	var garrison := VillageSpec.new(SEED)
+	garrison.population = 40
+	garrison.purpose = &"garrison"
+	garrison.vernacular = {"place": {"like": "desert_oasis"}}
+	VillagePlace.apply(garrison)
+	_ok(res, implied.enclosure == &"wall" and implied.valid() and garrison.enclosure == &"wall" and garrison.valid(),
+		"desert_oasis: 60 shown and 5000 implied keep '%s', a garrison of 40 '%s'" % [implied.enclosure, garrison.enclosure])
+	# a place that makes a small walled garrison a market leaves it a palisade,
+	# not a spec that refuses itself
+	var held := VillageSpec.new(SEED)
+	held.population = 40
+	held.purpose = &"garrison"
+	held.enclosure = &"wall"
+	held.vernacular = {"place": {"like": "rhine_town"}}
+	VillagePlace.apply(held)
+	_ok(res, held.purpose == &"market" and held.enclosure == &"palisade" and held.valid(),
+		"rhine_town over a walled garrison of 40: purpose %s, enclosure %s, errors %s" % [held.purpose, held.enclosure, held.errors()])
 	# a place leaves a caller's own upkeep alone when it is the lower
 	var worn := VillageSpec.new(SEED)
 	worn.upkeep = 0.1

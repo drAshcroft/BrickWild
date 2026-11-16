@@ -6,6 +6,70 @@ projects consume that, never this working tree (`docs/RELEASES.md`).
 `BrickWild.API_VERSION` is a separate compatibility number; see `README.md`
 and `docs/PUBLIC_API_TRANSPORT.md`.
 
+## 0.1.8 - 2026-11-16
+
+The site exporter takes a place. VoxelGames plans its cities through
+`tools/export_village_plan.gd`, which could not reach the vernaculars of 0.1.6
+and 0.1.7; now it can. Tag `v0.1.8`. `API_VERSION` stays 2. An export without
+`--vernacular` is byte-identical to 0.1.7's, flat and on ground.
+
+### Notable changes
+
+- **`--vernacular` on the exporter** (VXG-PLACE-EXPORT, `docs/VILLAGE_PLACE.md`
+  "From another process"). A file, or inline JSON starting with `{`, holding a
+  `VillageSpec.vernacular`: a region blend, `{"place": {...}}` or
+  `{"place": "<preset>"}`. A bad value is refused with exit 2 and the parse
+  errors. The place is laid over the SiteRequest's spec with
+  `VillagePlace.apply`, the village family's order, and every value it moves
+  is a line in `notes`.
+- **The city's facts beat a preset's.** A `like` preset carries its own
+  wealth, purpose, water and defence (`rhine_town` is wealth 0.85, a market).
+  In the exporter the SiteRequest's wealth, purpose, water and walls stand,
+  and a place that states no wealth takes the city's; the caller's own stated
+  feature beats both. The place as applied carries the wealth it was built
+  at.
+- **The culture rule.** A culture the request names, directly or through
+  `CULTURE_MAP`, stands, `english` included (`VillageSpec.culture_named`, set
+  only by the exporter with the flag). A culture BrickWild does not know is
+  left at the default rather than hash-picked, so the place's layout culture
+  builds the lots and the castle.
+- **The plan says what it was built as.** With the flag: `vernacular` (as
+  applied), `culture` REWRITTEN to the culture the buildings were built in
+  (`effective_culture()`; no `culture_built` key), a `look` and any `jank` on
+  every house and shop request, and `vernacular_check` {ok, failures,
+  warnings}.
+
+### Fixes
+
+- **A wall is manned by the civic people.** `VillagePlace.apply` decided wall
+  or palisade on the shown population only, so a walled place on a city of 60
+  shown and millions implied got a palisade. It now counts
+  `civic_population()`, and a garrison mans its wall at any size even when the
+  place states no purpose.
+- **A place no longer makes a small garrison refuse itself.** A place that
+  names another purpose over a walled garrison under 150 people left a spec
+  that failed `valid()` (exit 3 from the exporter). The wall is now a
+  palisade.
+
+### Measured
+
+- Without the flag, Thaannafu flat and Wuunafu flat and on its ground export
+  byte-identical plans to 0.1.7's (sha256 7d4514d0..., bf585c0c...,
+  81c81f36...). `dmvbrief`, `vplace` and `vplacebuild`: 950 checks, green.
+- With `{"place": {"like": "rhine_town", "stone": 0.8, "inequality": 0.8}}`,
+  the owner's place for `culture:river-crown-compact`: Thaannafu (45 shown,
+  flat) 198 s and Wuunafu (60 shown, on its ground) 860 s, both exit 0, both
+  `vernacular_check.ok`, every house and shop with a look; built `frankish`,
+  still a walled garrison at the gate, at the city's wealth 1.0. 21 of the 24
+  houses and shops in Wuunafu are the townhouse chassis: the place changes
+  their colours, trim and roofs, not their type.
+
+### Not in this release
+
+- VXG-PLACE-PALETTE: the plan does not yet carry the place's ground, road and
+  common colours, its plant keys or its masonry. A SiteRequest cannot carry a
+  vernacular of its own; only the flag can.
+
 ## 0.1.7 - 2026-11-16
 
 A village can be described by what the place IS, not by which region it copies:

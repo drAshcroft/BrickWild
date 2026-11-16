@@ -1400,7 +1400,11 @@ static func region(place: Variant) -> Dictionary:
 ## was stated or follows from a stated feature is here, so a request's own
 ## value stands wherever the place is silent.
 ##   {wealth?, upkeep, decoration_level, water?, purpose?, enclosure?}
-static func settings(place: Variant, population := 40) -> Dictionary:
+## `population` is the people who would man a wall: the CIVIC population when
+## the caller implies more than it shows (`VillageSpec.civic_population`).
+## `purpose` is the village's own, which stands where the place states none:
+## a garrison mans its wall however few it is.
+static func settings(place: Variant, population := 40, purpose := &"") -> Dictionary:
 	var p := parse(place)
 	var stated: Dictionary = p["features"]
 	var f := derive(stated)
@@ -1415,8 +1419,8 @@ static func settings(place: Variant, population := 40) -> Dictionary:
 	if float(f["defence"]) >= 0.0:
 		var d := float(f["defence"])
 		var enclosure: StringName = &"none" if d < 0.25 else (&"hedge" if d < 0.5 else (&"palisade" if d < 0.8 else &"wall"))
-		var purpose: StringName = out.get("purpose", &"")
-		if enclosure == &"wall" and population < VillageSpec.WALL_MIN_POPULATION and purpose != &"garrison":
+		var manned_by: StringName = out.get("purpose", purpose)
+		if enclosure == &"wall" and population < VillageSpec.WALL_MIN_POPULATION and manned_by != &"garrison":
 			enclosure = &"palisade"   # too few to build and man a wall
 		out["enclosure"] = enclosure
 	return out
@@ -1425,7 +1429,9 @@ static func settings(place: Variant, population := 40) -> Dictionary:
 ## Lay a spec's place over the spec: the village settings the place states,
 ## and the spec's own wealth into a place that states none (so the request's
 ## wealth slider still moves a place village). Nothing happens to a spec
-## with no place. Call before `spec.valid()`.
+## with no place. Call before `spec.valid()`. A wall is manned by the civic
+## population, and a garrison mans one at any size; a place that turns a
+## small garrison into something else leaves it a palisade.
 static func apply(spec: VillageSpec) -> void:
 	if not spec.vernacular.has("place"):
 		return
@@ -1442,7 +1448,8 @@ static func apply(spec: VillageSpec) -> void:
 		place["wealth"] = snappedf(spec.wealth, 0.01)
 		spec.vernacular = spec.vernacular.duplicate(true)
 		spec.vernacular["place"] = place
-	var s := settings(place, spec.population)
+	var garrison_before := spec.purpose == &"garrison"
+	var s := settings(place, spec.civic_population(), spec.purpose)
 	if s.has("wealth"):
 		spec.wealth = float(s["wealth"])
 	spec.upkeep = minf(spec.upkeep, float(s["upkeep"]))
@@ -1454,6 +1461,12 @@ static func apply(spec: VillageSpec) -> void:
 		spec.purpose = s["purpose"]
 	if s.has("enclosure"):
 		spec.enclosure = s["enclosure"]
+	# a place that names another purpose takes away the garrison that manned
+	# the wall; too few people to man it keep a palisade instead, rather than
+	# leaving a spec that refuses itself
+	if garrison_before and spec.purpose != &"garrison" and spec.enclosure == &"wall" \
+			and spec.civic_population() < VillageSpec.WALL_MIN_POPULATION:
+		spec.enclosure = &"palisade"
 
 
 ## A village request for a place: `BuildingRequest.village` with the place in

@@ -16,6 +16,7 @@ static func run() -> SuiteResult:
 	_check_monuments_are_not_seats(result)
 	_check_small_wall(result)
 	_check_implied_programme(result)
+	_check_vernacular(result)
 	return result
 
 
@@ -463,3 +464,125 @@ static func _check_implied_programme(result: SuiteResult) -> void:
 	result.checked += 1
 	if EXPORTER.request_errors(negative).is_empty():
 		result.fail("a request with implied_population -1 was accepted")
+
+
+## The owner's place for Voxel_Build's `culture:river-crown-compact` (VoxelGames
+## culture_places.json, 2026-11-16).
+const PLACE := {"place": {"like": "rhine_town", "stone": 0.8, "inequality": 0.8}}
+
+
+## A brief's spec with `--vernacular` laid over it, in the exporter's order.
+static func _vernacular_spec(request: Dictionary, raw: String, vernacular: Dictionary,
+		notes: Array[String]) -> VillageSpec:
+	var spec: VillageSpec = EXPORTER.spec_from_request(request, raw, notes)
+	EXPORTER.apply_vernacular(spec, vernacular, request, notes)
+	spec.generate(spec.seed)
+	return spec
+
+
+static func _noted(notes: Array[String], words: String) -> bool:
+	return notes.any(func(n: String) -> bool: return n.contains(words))
+
+
+## VXG-PLACE-EXPORT: `--vernacular` on the exporter. (a) without it nothing
+## moves; (b) an unknown culture gives way to the place's, the city's own
+## wealth, purpose and walls beat a preset's, and every house and shop carries
+## its look; (c) a named culture stands, english included; (d) a bad value is
+## refused with the parse errors. The byte identity of a plan without the flag
+## is proved against the last release (docs/VILLAGE_PLACE.md).
+static func _check_vernacular(result: SuiteResult) -> void:
+	# (a)
+	var plain: VillageSpec = _spec(_base())
+	result.checked += 1
+	if not plain.vernacular.is_empty() or plain.culture != &"english" or plain.culture_named:
+		result.fail("(a) a brief without --vernacular has vernacular %s, culture %s, named %s" % [
+			plain.vernacular, plain.culture, plain.culture_named])
+	# (b) the real Wuunafu, Voxel_Build culture:river-crown-compact
+	var raw := FileAccess.get_file_as_string(WUUN)
+	var notes: Array[String] = []
+	var request: Dictionary = EXPORTER.with_implied_population(
+		EXPORTER.with_caller_population(JSON.parse_string(raw), "60", notes), "10614806")
+	var hashed: VillageSpec = EXPORTER.spec_from_request(request, raw)
+	var spec: VillageSpec = _vernacular_spec(request, raw, PLACE, notes)
+	var fs: VillageVernacular = spec.feature_set()
+	result.checked += 1
+	if fs == null or spec.culture != &"english" or spec.culture_named \
+			or spec.effective_culture() != fs.culture() or not _noted(notes, "not one BrickWild knows"):
+		result.fail("(b) river-crown-compact under a place: culture %s (named %s), built in %s, the place's %s; notes %s" % [
+			spec.culture, spec.culture_named, spec.effective_culture(), fs.culture() if fs != null else &"-", notes])
+	result.checked += 1
+	if not is_equal_approx(spec.wealth, hashed.wealth) or spec.purpose != hashed.purpose \
+			or spec.enclosure != hashed.enclosure or spec.water != hashed.water or not spec.valid():
+		result.fail("(b) the preset moved the city: wealth %.2f/%.2f purpose %s/%s enclosure %s/%s water %s/%s, errors %s" % [
+			spec.wealth, hashed.wealth, spec.purpose, hashed.purpose, spec.enclosure, hashed.enclosure,
+			spec.water, hashed.water, spec.errors()])
+	result.checked += 1
+	if not is_equal_approx(float(spec.vernacular["place"].get("wealth", -1.0)), 1.0) \
+			or not _noted(notes, "the city's wealth") or not _noted(notes, "would make purpose"):
+		result.fail("(b) the place as applied %s does not carry the city's wealth 1.0, or the notes do not say so: %s" % [
+			spec.vernacular, notes])
+	var looks := 0
+	for r in VillageProgrammer.programme(spec):
+		if r.kind != &"house" and r.kind != &"shop":
+			continue
+		var d: Dictionary = r.to_dict()
+		result.checked += 1
+		if (d.get("look", {}) as Dictionary).is_empty() or (r.jank != 0.0 and not d.has("jank")):
+			result.fail("(b) %s %s: its written request has no look (or loses its jank %.2f)" % [r.kind, r.style, r.jank])
+		else:
+			looks += 1
+	result.checked += 1
+	if looks == 0:
+		result.fail("(b) the programme under a place has no house or shop")
+	# the caller's own stated features beat the city's
+	var stated := {"place": {"like": "rhine_town", "wealth": 0.3, "purpose": "market"}}
+	var own_notes: Array[String] = []
+	var own: VillageSpec = _vernacular_spec(request, raw, stated, own_notes)
+	result.checked += 1
+	if not is_equal_approx(own.wealth, 0.3) or own.purpose != &"market":
+		result.fail("the caller's own wealth 0.3 and purpose market came out %.2f and %s" % [own.wealth, own.purpose])
+	# (c) a named culture stands, through CULTURE_MAP, and english with it
+	for row in [["fjord", &"norse"], ["river-song", &"english"], ["moorish", &"moorish"]]:
+		var named: Dictionary = _base()
+		named["culture"] = row[0]
+		var named_notes: Array[String] = []
+		var n: VillageSpec = _vernacular_spec(named, "", PLACE, named_notes)
+		result.checked += 1
+		if not n.culture_named or n.effective_culture() != row[1] or not _noted(named_notes, "it stands"):
+			result.fail("(c) the named culture '%s' was built as %s (named %s), wanted %s" % [
+				row[0], n.effective_culture(), n.culture_named, row[1]])
+	# a small walled military town whose place names another purpose: the
+	# garrison that manned the wall is gone, so a palisade, not a refusal
+	var military: Dictionary = _base()
+	military["regime"] = "military"
+	military["population"] = 45
+	military["buildings"] = {"stone-wall": 1.0}
+	var mil_notes: Array[String] = []
+	var town: VillageSpec = _vernacular_spec(military, "",
+		{"place": {"like": "rhine_town", "purpose": "market"}}, mil_notes)
+	result.checked += 1
+	if not town.valid() or town.enclosure != &"palisade" or not _noted(mil_notes, "enclosure 'wall' -> 'palisade'"):
+		result.fail("a military town of 45 that the place made a market: enclosure %s, errors %s, notes %s" % [
+			town.enclosure, town.errors(), mil_notes])
+	# (d) refused, with the parse errors
+	var file := "user://vxg_place_export_fixture.json"
+	var f := FileAccess.open(file, FileAccess.WRITE)
+	f.store_string(JSON.stringify(PLACE))
+	f.close()
+	var list_file := "user://vxg_place_export_list.json"
+	var lf := FileAccess.open(list_file, FileAccess.WRITE)
+	lf.store_string("[1, 2]")
+	lf.close()
+	for good in [file, JSON.stringify(PLACE)]:
+		var read: Dictionary = EXPORTER.vernacular_from_arg(good)
+		result.checked += 1
+		if not (read["errors"] as Array).is_empty() or JSON.stringify(read["vernacular"]) != JSON.stringify(PLACE):
+			result.fail("(d) a good --vernacular '%s' read as %s, errors %s" % [good.left(40), read["vernacular"], read["errors"]])
+	for row in [['{"place": {"like": "nowhere"}}', "nowhere"], ['{"place": {"stone": 3}}', "stone"],
+			[list_file, "not a JSON object"], ['{}', "no region"], ["{not json", "not a JSON object"],
+			["res://no/such/place.json", "cannot read"]]:
+		var read: Dictionary = EXPORTER.vernacular_from_arg(row[0])
+		var errors: Array = read["errors"]
+		result.checked += 1
+		if errors.is_empty() or not str(errors).contains(row[1]) or not (read["vernacular"] as Dictionary).is_empty():
+			result.fail("(d) --vernacular '%s' was not refused naming '%s': %s" % [row[0], row[1], errors])

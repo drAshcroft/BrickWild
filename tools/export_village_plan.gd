@@ -64,6 +64,32 @@ extends SceneTree
 ## `refused` block {reason, stopped, requested, placed, unplaced[], capacity,
 ## search}. `capacity.rules` names what removed the room (wet, cliff) in m2.
 ##
+## The caller may say what the city's people BUILD LIKE (VXG-PLACE-EXPORT,
+## docs/VILLAGE_PLACE.md): `--vernacular <file.json>`, or the JSON itself when
+## the value starts with `{`. The content is a `VillageSpec.vernacular`: a
+## region blend, `{"place": {...}}` or `{"place": "<preset>"}`. A value that
+## cannot be read or does not parse is refused with exit 2 and its errors.
+## A relative path is read from the PROJECT directory, because Godot's
+## `--path` changes the working directory: pass absolute paths.
+##
+## The place is laid over the spec the request made (`VillagePlace.apply`, the
+## village family's order), with two exporter rules, each written to `notes`:
+##
+##   * The CITY's facts beat a preset's. A `like` preset carries its own
+##     wealth, purpose, water and defence; here the request's wealth, purpose,
+##     water and walls stand unless the caller's place states the feature
+##     itself. A place that states none takes the city's wealth.
+##   * The culture. A culture the request names -- one of BrickWild's, or one
+##     `CULTURE_MAP` folds -- stands, `english` included. A culture BrickWild
+##     does not know is no longer a hash pick: the vernacular's culture builds
+##     the layout and the castle.
+##
+## The plan then carries `vernacular` (as applied), `culture` (the one the
+## buildings were BUILT in, `effective_culture()`), a `look` (and any `jank`)
+## on every house and shop request, and `vernacular_check`
+## {ok, failures, warnings}: `VillageVernacularCheck` on the planned buildings.
+## Without the flag the output is byte-identical to before.
+##
 ## Exit codes: 0 written, 2 usage or I/O, 3 refused (cannot satisfy).
 ##
 ## Scope, deliberately: no mesh, no props-as-geometry, no assets. This is the
@@ -90,7 +116,7 @@ func _init() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 	var opts: Dictionary = _options(args)
 	if not opts.has("request") or not opts.has("out"):
-		printerr("usage: --request <in.json> --out <out.json> [--population <people>] [--implied-population <people>] [--terrain <grid.json>] [--search-budget-s <s>] [--search-attempts <n>]")
+		printerr("usage: --request <in.json> --out <out.json> [--population <people>] [--implied-population <people>] [--terrain <grid.json>] [--vernacular <vernacular.json> | '{\"place\": ...}'] [--search-budget-s <s>] [--search-attempts <n>]  (absolute paths: --path changes the working directory)")
 		quit(2)
 		return
 	var text: String = _read(opts["request"])
@@ -113,6 +139,16 @@ func _init() -> void:
 		printerr(size_error)
 		quit(2)
 		return
+	# the caller asked for something that does not exist: exit 2, not 3
+	var vernacular: Dictionary = {}
+	if opts.has("vernacular"):
+		var read: Dictionary = vernacular_from_arg(String(opts["vernacular"]))
+		if not (read["errors"] as Array).is_empty():
+			for why in read["errors"]:
+				printerr("--vernacular refused: %s" % String(why))
+			quit(2)
+			return
+		vernacular = read["vernacular"]
 	var request: Dictionary = with_implied_population(
 		with_caller_population(parsed, population_arg, notes), implied_arg)
 	var spec: VillageSpec = spec_from_request(request, text, notes)
@@ -121,6 +157,8 @@ func _init() -> void:
 		printerr("SiteRequest refused: %s" % "; ".join(brief_errors))
 		quit(3)
 		return
+	if not vernacular.is_empty():
+		apply_vernacular(spec, vernacular, request, notes)
 	var ground: VillageTerrain = terrain_from_request(request,
 		String(opts["request"]).get_base_dir(), String(opts.get("terrain", "")))
 	if ground != null and not ground.valid():
@@ -164,6 +202,8 @@ func _init() -> void:
 		# the best partial plan beside the refusal; the exit code stays 3
 		var partial: Dictionary = site_plan(plan, request)
 		partial["refused"] = refused
+		if not vernacular.is_empty():
+			add_vernacular(partial, plan, false)
 		var pf := FileAccess.open(opts["out"], FileAccess.WRITE)
 		if pf != null:
 			pf.store_string(JSON.stringify(partial, "	", true) + "
@@ -184,6 +224,12 @@ func _init() -> void:
 		if plan.ground != null:
 			notes.append(siting_note(plan))
 		notes.append(ground_note(out))
+	if not vernacular.is_empty():
+		add_vernacular(out, plan, true)
+		var vc: Dictionary = out["vernacular_check"]
+		notes.append("vernacular_check: %s (%d failures, %d warnings)" % [
+			"the plan reads as its vernacular" if bool(vc["ok"]) else "the plan does NOT read as its vernacular",
+			(vc["failures"] as Array).size(), (vc["warnings"] as Array).size()])
 	out["notes"] = notes
 	for note in notes:
 		print("  note: %s" % note)
@@ -316,6 +362,133 @@ static func _label(spec: VillageSpec, request: BuildingRequest) -> String:
 	if not monument.is_empty():
 		return monument
 	return "%s/%s" % [request.kind, request.purpose] if request.purpose != &"" else String(request.kind)
+
+
+# ------------------------------------------------------------ vernacular
+
+## The village settings a place can state, as {place feature: spec field}. A
+## `like` preset's own value of one yields to the city's; the caller's own
+## stated value beats the city's (`apply_vernacular`).
+const PLACE_CITY_FIELDS := {"purpose": "purpose", "water": "water", "defence": "enclosure"}
+## The spec fields `apply_vernacular` writes a note for when they move.
+const VERNACULAR_FIELDS: Array[String] = ["wealth", "purpose", "water", "enclosure", "upkeep",
+	"decoration_level"]
+
+
+## `--vernacular`'s value read and judged: {"vernacular": Dictionary, "errors"}.
+## A value that starts with `{` is the JSON itself; anything else is a path,
+## read from the project directory when it is relative.
+static func vernacular_from_arg(value: String) -> Dictionary:
+	var text: String = value.strip_edges()
+	var where: String = "the inline value"
+	if not text.begins_with("{"):
+		where = text
+		if not FileAccess.file_exists(text):
+			return {"vernacular": {}, "errors": [
+				"cannot read %s (a relative path is read from the project directory, because --path changes the working directory)" % text]}
+		text = _read(text)
+	var parsed: Variant = JSON.parse_string(text)
+	if not parsed is Dictionary:
+		return {"vernacular": {}, "errors": ["%s is not a JSON object" % where]}
+	var errors: Array[String] = []
+	for why in VillageVernacular.parse(parsed)["errors"]:
+		errors.append(String(why))
+	return {"vernacular": parsed if errors.is_empty() else {}, "errors": errors}
+
+
+## Whether the request NAMES a culture BrickWild builds: one of its own, or one
+## `CULTURE_MAP` folds onto one. Anything else is a hash pick (`_culture_of`).
+static func culture_is_named(request: Dictionary) -> bool:
+	var c: String = String(request.get("culture", "")).to_lower()
+	if c.is_empty():
+		return false
+	return CULTURE_MAP.has(c) or StringName(c) in VillageSpec.CULTURES
+
+
+## Lay the caller's vernacular over the spec the request made, in the village
+## family's order (`VillagePlace.apply`, then the spec is judged), with the
+## exporter's two rules (the header says them). One note per value it moved.
+static func apply_vernacular(spec: VillageSpec, vernacular: Dictionary, request: Dictionary,
+		notes: Array[String]) -> void:
+	var source: String = String(spec.source_culture)
+	if culture_is_named(request):
+		spec.culture_named = true
+		notes.append("vernacular: the request names the culture '%s' (built as '%s'); it stands, and the vernacular builds the houses, shops and landmark" % [
+			source, String(spec.culture)])
+	else:
+		notes.append("vernacular: the request's culture '%s' is not one BrickWild knows (a hash would pick '%s'); the vernacular's culture builds the layout and the castle" % [
+			source, String(spec.culture)])
+		spec.culture = &"english"   # the default: effective_culture() then reads the vernacular's
+	var v: Dictionary = vernacular.duplicate(true)
+	var own := {}
+	var like := ""
+	if v.has("place"):
+		var place: Variant = v["place"]
+		if place is String or place is StringName:
+			place = {"like": String(place)}
+		place = (place as Dictionary).duplicate(true)
+		own = (place as Dictionary).duplicate()
+		own.erase("like")
+		like = String(place.get("like", "")).to_lower()
+		if not own.has("wealth"):
+			# the city's wealth, over a preset's: a place states what its people
+			# build like, the request how rich this city is
+			place["wealth"] = _n(spec.wealth)
+			var preset: Dictionary = VillagePlace.preset(like)
+			if preset.has("wealth"):
+				notes.append("vernacular: the place takes the city's wealth %.2f; the preset '%s' says %.2f (state wealth in the place to change it)" % [
+					spec.wealth, like, float(preset["wealth"])])
+		v["place"] = place
+	var before := {}
+	for field in VERNACULAR_FIELDS:
+		before[field] = spec.get(field)
+	spec.vernacular = v
+	VillagePlace.apply(spec)
+	var placed := {}
+	for field in VERNACULAR_FIELDS:
+		placed[field] = spec.get(field)
+	# a preset's purpose, water and defence yield to the city's own
+	for feature in PLACE_CITY_FIELDS:
+		if not own.has(feature):
+			spec.set(PLACE_CITY_FIELDS[feature], before[PLACE_CITY_FIELDS[feature]])
+	# the exporter's wall rule (`_enclosure_of`, `_settle_enclosure`): a wall is
+	# manned by the civic people or by a garrison
+	if spec.enclosure == &"wall" and spec.civic_population() < VillageSpec.WALL_MIN_POPULATION \
+			and spec.purpose != &"garrison":
+		spec.enclosure = &"palisade"
+	for field in VERNACULAR_FIELDS:
+		var was: Variant = before[field]
+		var now: Variant = spec.get(field)
+		if _moved(was, now):
+			notes.append("vernacular: %s %s -> %s, from the place" % [field, _say(was), _say(now)])
+		elif _moved(was, placed[field]):
+			notes.append("vernacular: the preset '%s' would make %s %s; the city's %s stands (state it in the place to change it)" % [
+				like, field, _say(placed[field]), _say(was)])
+
+
+static func _moved(a: Variant, b: Variant) -> bool:
+	if _is_number(a) and _is_number(b):
+		return absf(float(a) - float(b)) > PLACES * 0.5
+	return a != b
+
+
+static func _say(value: Variant) -> String:
+	return "%.2f" % float(value) if _is_number(value) else "'%s'" % String(value)
+
+
+## The keys `--vernacular` adds to a plan, and never without it: the
+## vernacular as applied, the culture the buildings were built in, and (for a
+## written plan) the vernacular check on its buildings.
+static func add_vernacular(out: Dictionary, plan: VillagePlan, with_check: bool) -> void:
+	var spec: VillageSpec = plan.spec
+	out["vernacular"] = spec.vernacular.duplicate(true)
+	out["culture"] = String(spec.effective_culture())
+	if not with_check:
+		return
+	var report: Dictionary = VillageVernacularCheck.new().check(
+		VillageVernacularCheck.measure_plan(plan), spec.feature_set())
+	out["vernacular_check"] = {"ok": bool(report["ok"]),
+		"failures": Array(report["failures"]).duplicate(), "warnings": Array(report["warnings"]).duplicate()}
 
 
 # ------------------------------------------------------- request -> spec

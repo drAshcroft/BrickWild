@@ -77,6 +77,12 @@ var refuse_early: bool = true
 ## plants, ground and name come from it, and -- when `culture` is left at the
 ## default -- the dominant region's culture stands for everything else.
 var vernacular: Dictionary = {}
+## True when the caller NAMED `culture` rather than leaving it at the default.
+## `english` is both the default and a culture a request can name; with this
+## set, a named english stands over the ground's and the vernacular's culture
+## in `effective_culture()`. Only the site exporter sets it, and only with
+## `--vernacular` (VXG-PLACE-EXPORT), so every other path is unchanged.
+var culture_named := false
 var _feature_set: VillageVernacular = null
 var _feature_key: String = ""
 
@@ -326,6 +332,8 @@ func ground_character() -> Dictionary:
 ## The culture the buildings are asked for: the ground's own when the caller
 ## left the culture at the default and the ground names one.
 func effective_culture() -> StringName:
+	if culture_named:
+		return culture
 	var named := StringName(String(ground_character().get("culture", "")))
 	if culture == &"english" and named in CULTURES:
 		return named

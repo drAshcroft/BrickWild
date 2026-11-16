@@ -184,10 +184,49 @@ spec is validated. A caller that builds from a `VillageSpec` calls it itself.
 | `upkeep` (or derives it) | `spec.upkeep`, never raised over one the caller lowered |
 | `ornament` and `upkeep` | `spec.decoration_level`, when the caller left it at 0.5 |
 | `water`, `purpose` | `spec.water`, `spec.purpose` |
-| `defence` | `spec.enclosure`: none, hedge, palisade, wall. A wall becomes a palisade under 150 people |
+| `defence` | `spec.enclosure`: none, hedge, palisade, wall. A wall becomes a palisade under 150 people (the CIVIC people, counting any the caller implies), unless the village is a garrison, which mans its wall at any size |
+
+A `like` preset's features count as stated. `{"like": "rhine_town"}` therefore
+brings `wealth: 0.85` and `purpose: "market"` with it, and they beat the
+request's. A place that names another purpose over a small walled garrison
+leaves it a palisade, not a spec that refuses itself.
 
 The layout culture reaches the village the way a region's does: only when the
 request left its culture at the default.
+
+### From another process: the site exporter
+
+`tools/export_village_plan.gd` takes a place too (VXG-PLACE-EXPORT, 0.1.8):
+
+```
+godot --headless --path <project> --script res://tools/export_village_plan.gd -- \
+  --request C:/abs/site-city-0002.json --population 60 --implied-population 10614806 \
+  --vernacular C:/abs/place.json --out C:/abs/plan.json
+```
+
+`--vernacular` is a file, or the JSON itself when it starts with `{`; the
+content is a `VillageSpec.vernacular`. Pass ABSOLUTE paths: Godot's `--path`
+changes the working directory, so a relative one is read from (and `--out`
+written into) the project. A value that cannot be read or does not parse is
+refused with exit 2 and the parse errors.
+
+The exporter lays the place over the spec its SiteRequest made, in the
+village family's order, with two rules of its own. Each move is a line in the
+plan's `notes`.
+
+| Rule | What happens |
+|---|---|
+| The city's facts beat a preset's | The request's wealth, purpose, water and walls stand over a `like` preset's. The caller's OWN stated feature beats the request's. A place with no wealth of its own takes the city's, so `{"like": "rhine_town"}` on a city of wealth 1.0 is built at 1.0, and the place as applied says so |
+| A named culture stands | One of BrickWild's cultures, or one `CULTURE_MAP` folds onto one (`fjord` is `norse`, `river-song` is `english`), is kept, english included (`VillageSpec.culture_named`) |
+| An unknown culture gives way | A culture BrickWild does not know (`culture:river-crown-compact`) is no longer a hash pick: the culture is left at the default, so the place's layout culture builds the lots and the castle |
+
+With the flag the plan also carries `vernacular` (as applied, with the wealth
+folded in), `culture` rewritten to the culture the buildings were BUILT in
+(`effective_culture()`), a `look` (and any `jank`) on every house and shop
+`request`, and `vernacular_check` {ok, failures, warnings}:
+`VillageVernacularCheck` on the planned buildings, so a consumer can see the
+plan reads as its place without running Godot. Without the flag the plan is
+byte-identical to 0.1.7's, flat and on ground.
 
 ## The presets
 
@@ -302,6 +341,16 @@ rows, then `vplace`. Changing `VillageVernacular` itself: `lane:vernacular` too.
 * **Order is weak.** It makes the houses uniform. It does not lay them in
   rows; the form is still chosen from population and purpose.
 * **Ground through the public request.** `terrain()` is for spec owners.
+* **The exporter's plan does not carry the place's colours.** A place says
+  the colours of its ground, roads and commons, its plants and its
+  landmark's masonry; a SitePlan carries none of them (VXG-PLACE-PALETTE,
+  open). Its `plant_palette` still names the brief's palette, while the trees
+  in its `props` come from the place's. Nor does a SiteRequest carry a
+  vernacular of its own yet: only `--vernacular` does.
+* **A preset is a whole point.** `like` brings every feature the preset
+  states, wealth and purpose included. Through `BuildingRequest` they beat the
+  request's; only the exporter makes the city's facts win. State the feature
+  to override it.
 * **Not yet looked at.** No place village has been rendered and judged by eye
   or by the vision model. `render_vernacular_villages.gd -- places=...` makes
   the pictures. The rows read right as tables; a table is not a village.
