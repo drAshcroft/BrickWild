@@ -6,6 +6,14 @@ variation a real village has in colour, house type and wealth. For a fantasy
 game, regions can be BLENDED, either feature by feature or as two peoples living
 side by side.
 
+**A region is one way in. The other is a place described by its features**
+(heat, rain, altitude, materials, wealth, upkeep, density, building habits):
+`request.vernacular = {"place": {...}}`. `VillagePlace` writes the region row
+from the features, and everything below then applies to it unchanged. See
+`docs/VILLAGE_PLACE.md`. Reach for a place when the village is not one of the
+four regions here; write a region only when a place needs exact, sourced
+distributions.
+
 Two halves:
 
 * **The dataset** (`src/village/vernacular_regions.json`) says what is NORMAL
@@ -73,6 +81,9 @@ regions.<id>
   wealth                         {rich, poor}: household shares at wealth 0.5;
                                  weathering {tier: 0..1}: how far paint has gone
                                  toward GRIME
+                                 grime hex?: what paint weathers toward instead
+                                 of GRIME; jank {tier: 0..1}?: how far a tier's
+                                 houses lean (both written by VillagePlace)
   size.area_scale                on the culture's real median footprint
   walls[], trim[]                colour clusters {name, w, hex: [a, b]}
   roofs.<recipe>                 {w, types {form: w}, pitch [min, max], material,

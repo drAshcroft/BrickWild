@@ -8,6 +8,9 @@ extends "res://tools/render_shots.gd"
 ##   godot --path . --script res://tools/render_vernacular_villages.gd
 ##   godot --path . --script res://tools/render_vernacular_villages.gd -- only=cyclades,norse
 ##   godot --path . --script res://tools/render_vernacular_villages.gd -- pop=60 seed=7 compact
+## VILLAGE-PLACE (docs/VILLAGE_PLACE.md): `places=` photographs villages of
+## places described by their features instead -- preset ids, or `all`:
+##   godot --path . --script res://tools/render_vernacular_villages.gd -- places=british_hamlet,sahel_town
 
 const VERN_ROOT := "res://artifacts/renders/vernacular"
 const VERN_SIZE := Vector2i(1280, 860)
@@ -29,6 +32,7 @@ func _init() -> void:
 	var pop := 50
 	var seed_value := 7
 	var compact := false
+	var fixtures: Array = FIXTURES.duplicate()
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("only="):
 			only = arg.trim_prefix("only=").split(",")
@@ -38,11 +42,18 @@ func _init() -> void:
 			seed_value = int(arg.trim_prefix("seed="))
 		elif arg == "compact":
 			compact = true
+		elif arg.begins_with("places="):
+			var ids := arg.trim_prefix("places=").split(",")
+			if ids == PackedStringArray(["all"]):
+				ids = PackedStringArray(VillagePlace.preset_ids())
+			fixtures = []
+			for id in ids:
+				fixtures.append({"key": "place_" + id, "vernacular": {"place": {"like": id}}, "purpose": &"farming"})
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(VERN_ROOT))
 	_build_stage()
 	_vp.size = VERN_SIZE
 	await process_frame
-	for fixture in FIXTURES:
+	for fixture in fixtures:
 		if not only.is_empty() and not String(fixture["key"]) in only:
 			continue
 		await _shoot(fixture, pop, seed_value, compact)

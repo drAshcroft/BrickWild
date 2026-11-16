@@ -161,6 +161,9 @@ static func _vernacular_houses(out: Array[BuildingRequest], spec: VillageSpec,
 			var dims := house_dims(style, area, seed_i)
 			request = BuildingRequest.house(seed_i, style, trade, dims.x, dims.y, 2.6, storeys)
 		request.look = g["look"]
+		# VILLAGE-PLACE: a house nobody shores up leans (CrookedWarp, through
+		# BrickWild.instantiate); 0 for every hand-written region
+		request.jank = float(g.get("jank", 0.0))
 		out.append(request)
 
 

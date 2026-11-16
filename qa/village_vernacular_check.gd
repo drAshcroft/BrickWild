@@ -296,15 +296,18 @@ static func nearest(colour: Color, region_id: StringName, group: String) -> Dict
 		for tid in row.get("houses", {}):
 			clusters.append_array(row["houses"][tid].get(group, []))
 	var lab := _lab(colour)
+	var grime := VillageVernacular.grime(region_id)
+	# a place left to rot weathers further than six samples can follow
+	var steps := maxi(SAMPLES_S, int(ceil(weather * 16.0)) + 1)
 	var best := {"name": "", "region": String(region_id), "dist": INF}
 	for cl in clusters:
 		var a := Color(String(cl["hex"][0]))
 		var b := Color(String(cl["hex"][1]))
 		for ti in range(SAMPLES_T):
 			var base := a.lerp(b, float(ti) / float(SAMPLES_T - 1))
-			for si in range(SAMPLES_S):
-				var s := weather * float(si) / float(SAMPLES_S - 1)
-				var d := lab.distance_to(_lab(base.lerp(VillageVernacular.GRIME, s)))
+			for si in range(steps):
+				var s := weather * float(si) / float(steps - 1)
+				var d := lab.distance_to(_lab(base.lerp(grime, s)))
 				if d < float(best["dist"]):
 					best = {"name": String(cl["name"]), "region": String(region_id), "dist": d}
 	return best

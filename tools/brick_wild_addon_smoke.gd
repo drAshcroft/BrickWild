@@ -58,6 +58,19 @@ func _init() -> void:
 				or (built.spec as HouseSpec).wall_color.to_html(false) != String(g["look"]["wall"][0]):
 			printerr("a regional look did not reach its house: %s" % [built.errors])
 			failed = true
+	# VILLAGE-PLACE: a place described by its features must make a region row
+	# inside the addon, by preset and by bare numbers, and its request must be
+	# one the library accepts
+	for place in [{"like": "nordic_mountain"}, {"heat": 0.9, "rain": 0.1, "wealth": 0.2, "upkeep": 0.1}]:
+		var made: Dictionary = VillagePlace.ensure(place)
+		var row: Dictionary = VillageVernacular.region(made["id"])
+		if not (made["errors"] as Array).is_empty() or (row.get("houses", {}) as Dictionary).is_empty():
+			printerr("a place made no region row in the addon: %s %s" % [place, made["errors"]])
+			failed = true
+	var place_errors: Array = BuildingLibrary.validate(VillagePlace.request(7, 30, "british_hamlet"))
+	if not place_errors.is_empty():
+		printerr("a place request was refused in the addon: %s" % [place_errors])
+		failed = true
 	var repeat := BrickWild.generate(BuildingRequest.church(101))
 	if repeat.name() != BrickWild.generate(BuildingRequest.church(101)).name():
 		printerr("same-seed generation was not deterministic")

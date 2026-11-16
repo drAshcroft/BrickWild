@@ -6,6 +6,89 @@ projects consume that, never this working tree (`docs/RELEASES.md`).
 `BrickWild.API_VERSION` is a separate compatibility number; see `README.md`
 and `docs/PUBLIC_API_TRANSPORT.md`.
 
+## 0.1.7 - 2026-11-16
+
+A village can be described by what the place IS, not by which region it copies:
+heat, rain, altitude, materials, wealth, upkeep, density and habits. The four
+regions of 0.1.6 were a few places; this is the space they sit in. Tag
+`v0.1.7`. `API_VERSION` stays 2. A request with no `place` reads, writes and
+builds exactly as it did in 0.1.6.
+
+### Notable changes
+
+- **A place by its features** (VILLAGE-PLACE, `docs/VILLAGE_PLACE.md`).
+  `request.vernacular = {"place": {...}}` takes any of 33 features in four
+  groups (land, materials, people, habit). State two and the rest are
+  DERIVED: a cold wet height gets stone, steep roofs and chimneys without
+  being told. A stated feature always wins. `VillagePlace.synthesise()` writes
+  an ordinary region row, so the blend, the Studio, the walk rig and
+  `VillageVernacularCheck` all work on a place unchanged, and a place can be
+  blended with a region or another place.
+- **Eighteen presets** are named points in that space, not a dataset:
+  `provence_hill`, `greek_island`, `nordic_mountain`, `british_hamlet`,
+  `rhine_town`, `alpine_valley`, `russian_collective`, `highland_croft`,
+  `congo_forest`, `savanna_kraal`, `sahel_town`, `desert_oasis`,
+  `andean_highland`, `japanese_farm`, `asian_city`, `monsoon_delta`,
+  `rotting_frontier`, `jewel_harbour`. `{"like": "british_hamlet", "wealth":
+  0.2}` is that hamlet, poor. `VillagePlace.request(seed, population, place)`
+  is the one-line way in.
+- **Decay is its own axis.** `wealth` buys size, storeys, ornament and costly
+  roofs; `upkeep` is whether anyone mends them. A rich neglected town and a
+  poor tidy one are both sayable. Low upkeep weathers paint toward a grime
+  that depends on the climate (`wealth.grime`: green-black in the wet, dust in
+  the dry) and makes houses lean (`wealth.jank` -> `BuildingRequest.jank`, the
+  crooked warp of 0.1.5).
+- **Studio.** A Place picker beside the region pickers, filled from
+  `describe_kind(&"village")["vernacular"]["place"]`; picking one sets the
+  wealth and upkeep sliders to the place's own.
+- **Tools.** `tools/probe_village_place.gd` prints the row a place makes and
+  what 400 drawn households come to; `tools/probe_place_village.gd` builds
+  whole villages through the public path; `tools/render_vernacular_villages.gd
+  -- places=<ids|all>` photographs them.
+
+### Fixes
+
+- **The test runner did not compile at 0.1.6.** `qa/crooked_check.gd` aliased
+  a global class in a const (`const Integrity := MeshIntegrityCheck`), which is
+  a parse error, and the runner preloads every suite. The installed addon was
+  not affected at run time (nothing there loads `CrookedCheck`), but no suite
+  ran from the 0.1.6 tree. The class is now named where it is used.
+
+### Compatibility
+
+- **Nothing moves without a place.** The four regional rows are untouched, and
+  `vplace` holds a regional village's households identical with the module
+  loaded. `vernacular.place` is optional; `schema_version` stays 1.
+- A place registers its row under `place_<preset>` or `place_<hash>`.
+  `VillageVernacular.region_ids()` lists the shipped regions only.
+
+### Known issues
+
+- A place chooses among the twelve house chassis that exist; it cannot invent
+  one (a stilt longhouse is a raised cottage).
+- `relief` and `altitude` shape the buildings and the form. They tilt the
+  ground only for a caller that passes `VillagePlace.terrain()` itself.
+- Landmarks are the four sacred shapes the church family has; plants are the
+  catalogue's (no palm, olive or bamboo).
+- Place villages have not been rendered and judged by eye for this release,
+  and the full village QA (`BrickWild.check`) was not run on them.
+
+### Lanes
+
+Run on this tree (15-16 Nov), on a loaded host. The scheduled gates were not
+run for this release.
+
+| Lane | Checks | Result |
+|---|---|---|
+| `vplace` | 654 | pass, three failing controls |
+| `vplacebuild` | 63 | pass, 45 distinct builds |
+| `vvernacular` | 66 | pass |
+| `vvernacularbuild` | 38 | pass |
+| `crooked` | 2097 | pass |
+| `tests/studio_village_test.gd` | -- | pass |
+| `tools/probe_place_village.gd` | 3 villages | 3 pass VillageVernacularCheck |
+| `tools/test_brick_wild_addon_installer.ps1 -GodotPath ...` | 1085 files | pass, Godot verified |
+
 ## 0.1.6 - 2026-11-15
 
 A village can be built from a real region (Provence, the Cyclades, the Norse

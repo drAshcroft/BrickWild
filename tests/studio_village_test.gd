@@ -88,3 +88,27 @@ func _check_vernacular(ui, descriptor: Dictionary) -> void:
 	if BuildingRequest.from_json(req.to_json()).to_dict() != req.to_dict(): failures.append("Blend lost in request JSON")
 	pick.call(ui.region_opt, "")
 	if not ui.vernacular().is_empty() or ui.blend_opt.visible: failures.append("None did not clear the region")
+	# VILLAGE-PLACE: the presets are the descriptor's; a place replaces the
+	# region, brings its own wealth and upkeep to the sliders, and the sliders
+	# then drive it
+	var presets: Array = descriptor["vernacular"]["place"]["presets"]
+	if ui.place_opt.item_count != presets.size() + 1: failures.append("Place options drift from the descriptor")
+	if not ui.place_opt.visible: failures.append("Place control hidden for a village")
+	for i in range(ui.place_opt.item_count):
+		if String(ui.place_opt.get_item_metadata(i)) == "rotting_frontier":
+			ui.place_opt.select(i)
+	ui._place_picked()
+	ui._controls_changed()
+	var pv: Dictionary = ui.vernacular()
+	if pv.get("place", {}).get("like", "") != "rotting_frontier" or float(pv["place"].get("upkeep", 1.0)) > 0.1 \
+			or float(pv["place"].get("wealth", 1.0)) > 0.2:
+		failures.append("A place did not bring its wealth and upkeep: %s" % pv)
+	if ui.region_opt.visible or ui.blend_opt.visible: failures.append("Region pickers shown beside a place")
+	ui.upkeep_slider.value = 0.9
+	if not is_equal_approx(float(ui.vernacular()["place"]["upkeep"]), 0.9): failures.append("The upkeep slider does not drive a place")
+	var preq: BuildingRequest = ui._request(42)
+	if not BuildingLibrary.validate(preq).is_empty(): failures.append("Studio's place refused: %s" % BuildingLibrary.validate(preq))
+	if BuildingRequest.from_json(preq.to_json()).to_dict() != preq.to_dict(): failures.append("Place lost in request JSON")
+	ui.place_opt.select(0)
+	ui._controls_changed()
+	if not ui.vernacular().is_empty() or not ui.region_opt.visible: failures.append("None did not clear the place")

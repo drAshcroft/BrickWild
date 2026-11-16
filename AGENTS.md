@@ -43,6 +43,11 @@ godot --headless --path . --script res://tools/draw_dungeon_sheet.gd -- --plan p
 # regional villages (Provence, Cyclades, Norse, Japanese) and their blends:
 # the dataset, the check and every house type built; see docs/VILLAGE_VERNACULAR.md
 godot --headless --path . --script res://tests/run_all.gd -- lane:vernacular
+# a village from a PLACE described by its features (heat, rain, altitude, materials,
+# wealth, upkeep, density, habits) instead of a named region; see docs/VILLAGE_PLACE.md
+godot --headless --path . --script res://tests/run_all.gd -- lane:place
+# what row a place's features make, and what 400 drawn households come to
+godot --headless --path . --script res://tools/probe_village_place.gd -- british_hamlet
 # ...and photographed (not headless) -> artifacts/renders/vernacular/
 godot --path . --script res://tools/render_vernacular_villages.gd
 # the five windmills, every one of them, against WindmillCheck
@@ -151,6 +156,7 @@ godot --headless --path . --script res://tests/run_all.gd -- lane:geom
 | stair streets, access flights, the 3D village walk: `VillageAccessSteps`, `VillageWalk3D`, `VillageWalk` on terrain | `vstepswalk`, then `vgroundterrain` | ~14 m loaded host, 91 checks (Manarola, Positano, Masouleh's stepped through road); see docs/VILLAGE_TERRAIN.md "Steps and the 3D walk" |
 | `VillageSiteAnalysis` (slope classes, landforms, drainage, contours, level regions) | `vanalysis` | ~15 s host, 47 checks; see docs/VILLAGE_TERRAIN.md |
 | the regional dataset `src/village/vernacular_regions.json`, `VillageVernacular` (blends), `VillageVernacularCheck`, a house/shop `look` (`HouseSpec.LOOK_KEYS`, `style_row()`) | `lane:vernacular` (`vvernacular`, then `vvernacularbuild`) | 210 s + 119 s host (15 Nov), 63 + 38 checks, three failing controls; see docs/VILLAGE_VERNACULAR.md |
+| a place described by its features: `src/village/village_place.gd` (`FEATURES`, `PRESETS`, `derive`, `synthesise`), `wealth.grime` / `wealth.jank` in a region row | `tools/probe_village_place.gd -- brief` and read the rows, then `lane:place` (`vplace`, then `vplacebuild`) | 130 s + 123 s loaded host (15 Nov), 654 + 63 checks, three failing controls; see docs/VILLAGE_PLACE.md |
 | the world settlement set, `tools/settlements/` | `vworld` | seconds; see docs/SETTLEMENT_TESTSET.md |
 | exhaustive castle sweep | `lane:castle` | scheduled; over 12 m for `caccess` alone |
 | the crooked warp: `core/haunt/crooked_warp.gd`, `qa/crooked_check.gd`, `BuildingRequest.jank` | `lane:haunt` | 5 m host, 2097 checks (26 Oct; every kind but hotel, plus a sloped and a pile house) |
@@ -254,6 +260,12 @@ file.
 
 ## Gotchas
 
+* **Never alias a global class in a const.** `const Integrity := MeshIntegrityCheck` is
+  a parse error ("isn't a constant expression"), and because `run_all_impl.gd` preloads
+  every suite, one such line stops EVERY suite: "RUNNER FAILED: suite runner could not
+  compile". Release 0.1.6 shipped it in `qa/crooked_check.gd`. Name the class where it is
+  used, or `preload` a file beside the script. After any edit to a `qa/` or `src/` script,
+  run one seconds-long suite (`-- vworld`) before trusting anything else.
 * A GDScript **parse error makes the headless runner hang** rather than exit.
   If a run stops producing output, read the top of the log for "Parse Error"
   instead of waiting on it.

@@ -16,7 +16,10 @@ extends RefCounted
 ##
 ## A defect is returned as text, one line each; an empty list is a pass.
 
-const Integrity := MeshIntegrityCheck   # a class: res://qa/... is runtime/qa/ in the addon
+# MeshIntegrityCheck is named as a CLASS below, never preloaded by path (res://qa/... is
+# runtime/qa/ in the addon) and never aliased in a const: a global class is not a
+# constant expression, so `const Integrity := MeshIntegrityCheck` is a parse error that
+# takes the whole suite runner down with it (release 0.1.6 shipped that line).
 const DET_TOL := 1e-4
 const Y_TOL := 1e-4
 
@@ -30,7 +33,7 @@ static func check(warp: CrookedWarp, before: ArrayMesh, after: ArrayMesh,
 		return out
 	out.append_array(check_levels(warp, before, after, where))
 	out.append_array(check_one_storey(warp, after, where))
-	for failure in Integrity.check(after, where):
+	for failure in MeshIntegrityCheck.check(after, where):
 		out.append("%s: integrity: %s" % [where, failure])
 	return out
 

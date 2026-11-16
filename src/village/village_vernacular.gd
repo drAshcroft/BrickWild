@@ -66,6 +66,11 @@ var blend: Dictionary = {}
 ## name has the blend's own weights.
 var groups: Dictionary = {}
 var coherence: float = 0.0
+## VILLAGE-PLACE: the place the request described by its features, as asked,
+## and the region id its row was registered under ({} and &"" when the
+## vernacular names regions only).
+var place: Dictionary = {}
+var place_id: StringName = &""
 
 
 # ================================================================== dataset
@@ -87,13 +92,15 @@ static func dataset() -> Dictionary:
 	return _dataset
 
 
-## Every region a blend may name: the dataset's and the registered ones.
+## Every region a blend may name: the dataset's and the registered ones. A
+## row VillagePlace made from a request's features is not listed: it is that
+## request's own, named "place" in its blend, and there is one per place asked.
 static func region_ids() -> Array[StringName]:
 	var names: Array[String] = []
 	for id in dataset()["regions"]:
 		names.append(String(id))
 	for id in _custom:
-		if not names.has(String(id)):
+		if not names.has(String(id)) and not (_custom[id] as Dictionary).has("place"):
 			names.append(String(id))
 	names.sort()
 	var out: Array[StringName] = []
@@ -170,6 +177,16 @@ static func region_errors(row: Dictionary) -> Array[String]:
 		for tier in wealth["weathering"]:
 			if not StringName(String(tier)) in TIERS or not _num01(wealth["weathering"][tier]):
 				out.append("wealth.weathering: '%s' wants a tier and a share 0..1" % str(tier))
+	if wealth is Dictionary:
+		if wealth.has("grime") and not Color.html_is_valid(String(wealth["grime"])):
+			out.append("wealth.grime: '%s' is not a hex colour" % str(wealth["grime"]))
+		var janks: Variant = wealth.get("jank", {})
+		if not janks is Dictionary:
+			out.append("wealth.jank: {tier: share 0..1}")
+		else:
+			for tier in janks:
+				if not StringName(String(tier)) in TIERS or not _num01(janks[tier]):
+					out.append("wealth.jank: '%s' wants a tier and a share 0..1" % str(tier))
 	var scale: Variant = row.get("size", {}).get("area_scale", 1.0)
 	if not _num(scale) or float(scale) < 0.4 or float(scale) > 2.0:
 		out.append("size.area_scale wants 0.4..2.0")
@@ -321,18 +338,33 @@ static func describe() -> Array[Dictionary]:
 ## and aliases are folded to the region id.
 static func parse(v: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
+	var place_id: StringName = &""
 	var blend_in: Variant = v
 	var groups_in: Variant = {}
 	var coh: Variant = 0.0
-	var structured := v.has("blend") or v.has("groups") or v.has("coherence")
+	var structured := v.has("blend") or v.has("groups") or v.has("coherence") or v.has("place")
 	if structured:
 		for key in v:
-			if not String(key) in ["blend", "groups", "coherence"]:
-				errors.append("vernacular: '%s' is not blend, groups or coherence" % str(key))
+			if not String(key) in ["blend", "groups", "coherence", "place"]:
+				errors.append("vernacular: '%s' is not place, blend, groups or coherence" % str(key))
 		blend_in = v.get("blend", {})
+		if v.has("place"):
+			# VILLAGE-PLACE: a place described by its features is a region row
+			# made on the spot (VillagePlace.synthesise) and registered; alone
+			# it is the whole blend, and a blend may name it as "place"
+			var made: Dictionary = VillagePlace.ensure(v["place"])
+			for why in made["errors"]:
+				errors.append(String(why))
+			var no_blend: bool = not blend_in is Dictionary or (blend_in as Dictionary).is_empty()
+			if (made["errors"] as Array).is_empty():
+				place_id = made["id"]
+				if no_blend:
+					blend_in = {String(place_id): 1.0}
+			elif no_blend:
+				return {"blend": {}, "groups": {}, "coherence": 0.0, "place": &"", "errors": errors}
 		groups_in = v.get("groups", {})
 		coh = v.get("coherence", 0.0)
-	var out_blend := _weights(blend_in, errors, "blend")
+	var out_blend := _weights(blend_in, errors, "blend", place_id)
 	if out_blend.is_empty() and errors.is_empty():
 		errors.append("vernacular: the blend names no region with a weight over 0")
 	var out_groups := {}
@@ -343,16 +375,20 @@ static func parse(v: Dictionary) -> Dictionary:
 			if not StringName(String(g)) in GROUPS:
 				errors.append("vernacular: no group '%s' (one of %s)" % [str(g), str(GROUPS)])
 				continue
-			var w := _weights(groups_in[g], errors, "groups.%s" % String(g))
+			var w := _weights(groups_in[g], errors, "groups.%s" % String(g), place_id)
 			if not w.is_empty():
 				out_groups[StringName(String(g))] = w
 	if not _num01(coh):
 		errors.append("vernacular: coherence wants 0..1")
 		coh = 0.0
-	return {"blend": out_blend, "groups": out_groups, "coherence": float(coh), "errors": errors}
+	return {"blend": out_blend, "groups": out_groups, "coherence": float(coh), "place": place_id,
+		"errors": errors}
 
 
-static func _weights(d: Variant, errors: Array[String], where: String) -> Dictionary:
+## `place_id`: the region the request's own place was registered as; a
+## weight keyed "place" names it.
+static func _weights(d: Variant, errors: Array[String], where: String,
+		place_id: StringName = &"") -> Dictionary:
 	if not d is Dictionary:
 		errors.append("vernacular: %s wants {region: weight}" % where)
 		return {}
@@ -360,6 +396,8 @@ static func _weights(d: Variant, errors: Array[String], where: String) -> Dictio
 	var total := 0.0
 	for k in d:
 		var id := resolve_id(k)
+		if String(k) == "place" and place_id != &"":
+			id = place_id
 		if region(id).is_empty():
 			errors.append("vernacular: no region '%s' (one of %s)" % [str(k), str(region_ids())])
 			continue
@@ -384,6 +422,10 @@ static func resolve(v: Dictionary) -> VillageVernacular:
 	var fs := VillageVernacular.new()
 	fs.blend = p["blend"]
 	fs.coherence = p["coherence"]
+	if v.has("place"):
+		fs.place = (v["place"] as Dictionary).duplicate(true) if v["place"] is Dictionary \
+			else {"like": String(v["place"])}
+		fs.place_id = p["place"]
 	for g in GROUPS:
 		fs.groups[g] = (p["groups"] as Dictionary).get(g, fs.blend)
 	return fs
@@ -395,7 +437,10 @@ func to_dict() -> Dictionary:
 	for k in groups:
 		if groups[k] != blend:
 			g[String(k)] = groups[k]
-	return {"blend": blend, "groups": g, "coherence": coherence}
+	var out := {"blend": blend, "groups": g, "coherence": coherence}
+	if not place.is_empty():
+		out["place"] = place
+	return out
 
 
 ## The blend in words: "Provence", "Norse 50% + Japanese 50%",
@@ -567,9 +612,9 @@ func _genome(rng: RandomNumberGenerator, parents: Dictionary, type_id: String,
 	var storeys := int(String(_pick(rng, type.get("storeys", {"1": 1.0}))))
 	var look: Dictionary = (type.get("look", {}) as Dictionary).duplicate(true)
 	var wall := _colour(rng, _clusters(parents[&"walls"], home_id, type, "walls"),
-		_weathering(parents[&"walls"], tier))
+		_weathering(parents[&"walls"], tier), grime(parents[&"walls"]))
 	var trim := _colour(rng, _clusters(parents[&"trim"], home_id, type, "trim"),
-		_weathering(parents[&"trim"], tier))
+		_weathering(parents[&"trim"], tier), grime(parents[&"trim"]))
 	var roof := _roof(rng, parents[&"roofs"], home_id, type, style, tier)
 	look["wall"] = [_hex(wall["colour"]), _hex(wall["colour"])]
 	look["trim"] = [_hex(trim["colour"]), _hex(trim["colour"])]
@@ -579,7 +624,7 @@ func _genome(rng: RandomNumberGenerator, parents: Dictionary, type_id: String,
 	return {
 		"type": type_id, "region": home_id, "style": style, "storeys": storeys,
 		"area": float(type.get("area", 1.0)) * float(home.get("size", {}).get("area_scale", 1.0)),
-		"look": look, "parents": parents, "tier": tier,
+		"look": look, "parents": parents, "tier": tier, "jank": _jank(home_id, tier),
 		"clusters": {"walls": wall["name"], "trim": trim["name"], "roof": roof["recipe"],
 			"roof_colour": roof["colour_name"], "roof_form": roof["form"]},
 	}
@@ -635,12 +680,27 @@ static func _weathering(region_id: StringName, tier: StringName) -> float:
 	return float(region(region_id).get("wealth", {}).get("weathering", {}).get(String(tier), 0.0))
 
 
+## What a region's paint weathers toward: its own `wealth.grime` (moss in a
+## wet country, dust in a dry one; VillagePlace writes it), else GRIME.
+static func grime(region_id: StringName) -> Color:
+	var hex := String(region(region_id).get("wealth", {}).get("grime", ""))
+	return Color(hex) if not hex.is_empty() and Color.html_is_valid(hex) else GRIME
+
+
+## How crooked a tier's houses stand, 0..1 (`wealth.jank`; BuildingRequest.
+## jank): the lean of a house nobody has shored up. 0 where a region says
+## nothing, which is every hand-written one.
+static func _jank(region_id: StringName, tier: StringName) -> float:
+	return float(region(region_id).get("wealth", {}).get("jank", {}).get(String(tier), 0.0))
+
+
 ## A colour from weighted clusters: the cluster, a point along it, and up to
 ## `weather` of the way toward GRIME (half to all of it, by a draw).
-static func _colour(rng: RandomNumberGenerator, clusters: Array, weather: float) -> Dictionary:
+static func _colour(rng: RandomNumberGenerator, clusters: Array, weather: float,
+		toward: Color = GRIME) -> Dictionary:
 	var c: Dictionary = clusters[_pick_index(rng, clusters)]
 	var col := Color(String(c["hex"][0])).lerp(Color(String(c["hex"][1])), rng.randf())
-	col = col.lerp(GRIME, weather * (0.5 + 0.5 * rng.randf()))
+	col = col.lerp(toward, weather * (0.5 + 0.5 * rng.randf()))
 	return {"name": String(c["name"]), "colour": col}
 
 
@@ -685,7 +745,8 @@ static func _roof(rng: RandomNumberGenerator, roof_region: StringName, home_id: 
 		# its edge is a lid (HS-SAHEL-RESIDUE)
 		if String(form) == "flat":
 			keys["parapet"] = 1.0
-	var colour := _colour(rng, r["colours"], _weathering(roof_region, tier) * ROOF_WEATHER)
+	var colour := _colour(rng, r["colours"], _weathering(roof_region, tier) * ROOF_WEATHER,
+		grime(roof_region))
 	keys["roof"] = [_hex(colour["colour"]), _hex(colour["colour"])]
 	return {"recipe": rid, "keys": keys, "colour_name": colour["name"],
 		"form": String(form) if form != null else ""}

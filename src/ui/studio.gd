@@ -76,6 +76,11 @@ var upkeep_label: Label
 ## the roofs and the paint come from. Every list is the descriptor's
 ## (`describe_kind(&"village")["vernacular"]`); "" means none / the blend.
 var region_opt: OptionButton
+## VILLAGE-PLACE (docs/VILLAGE_PLACE.md): a place described by its features,
+## picked from the descriptor's presets. A place replaces the region: the
+## wealth and upkeep sliders jump to the place's own and then drive it.
+var place_opt: OptionButton
+var place_label: Label
 var blend_opt: OptionButton
 var share_slider: HSlider
 var coherence_slider: HSlider
@@ -156,6 +161,7 @@ func _add_landscape_controls() -> void:
 	_add_vernacular_controls()
 	for control in [water_label, water_opt, edge_label, edge_opt,
 			decoration_label, decoration_slider, upkeep_label, upkeep_slider,
+			place_label, place_opt,
 			region_label, region_opt, blend_label, blend_opt, share_label, share_slider,
 			coherence_label, coherence_slider, roofs_label, roofs_opt, paint_label, paint_opt,
 			orientation_label, orientation_spin, period_label, period_spin,
@@ -184,6 +190,13 @@ func _add_vernacular_controls() -> void:
 	roofs_label.text = "Roofs from"
 	paint_label = Label.new()
 	paint_label.text = "Paint from"
+	place_label = Label.new()
+	place_label.text = "Place"
+	place_opt = OptionButton.new()
+	place_opt.tooltip_text = "Build the village for a place described by its features: climate, altitude, materials, wealth, upkeep, crowding and building habits. Wealth and Upkeep jump to the place's own and can then be moved: low upkeep is decay and rot. None leaves the region or the culture."
+	# before the regenerate below, so the sliders have moved when it runs
+	place_opt.item_selected.connect(func(_i): _place_picked())
+	place_opt.item_selected.connect(func(_i): _controls_changed())
 	region_opt = OptionButton.new()
 	blend_opt = OptionButton.new()
 	roofs_opt = OptionButton.new()
@@ -223,6 +236,14 @@ func _fill_vernacular(cfg: Dictionary) -> void:
 			opt.set_item_metadata(opt.item_count - 1, StringName(row["id"]))
 			opt.set_item_tooltip(opt.item_count - 1, String(row.get("summary", "")))
 		opt.select(0)
+	place_opt.clear()
+	place_opt.add_item("None")
+	place_opt.set_item_metadata(0, &"")
+	for row in v.get("place", {}).get("presets", []):
+		place_opt.add_item(String(row["label"]))
+		place_opt.set_item_metadata(place_opt.item_count - 1, StringName(row["id"]))
+		place_opt.set_item_tooltip(place_opt.item_count - 1, String(row.get("summary", "")))
+	place_opt.select(0)
 	var c: Dictionary = v.get("coherence", {})
 	coherence_slider.min_value = float(c.get("min", 0.0))
 	coherence_slider.max_value = float(c.get("max", 1.0))
@@ -243,6 +264,11 @@ static func _picked(opt: OptionButton) -> StringName:
 ## {region: 1} for one region and nothing else; else {blend, groups,
 ## coherence}. A second region that is the first, or a share of 0, is no blend.
 func vernacular() -> Dictionary:
+	var place := _picked(place_opt)
+	if place != &"":
+		# the sliders are the place's wealth and care, so they can be moved
+		return {"place": {"like": String(place), "wealth": snappedf(length_slider.value / 100.0, 0.01),
+			"upkeep": snappedf(upkeep_slider.value, 0.01)}}
 	var first := _picked(region_opt)
 	if first == &"":
 		return {}
@@ -271,10 +297,36 @@ func vernacular() -> Dictionary:
 	return out
 
 
+## A place was picked: the wealth and upkeep sliders take the place's own
+## values (a rotting frontier arrives rotten), and from there they are the
+## user's to move.
+func _place_picked() -> void:
+	var place := _picked(place_opt)
+	if place == &"":
+		return
+	var f := VillagePlace.derive(VillagePlace.preset(place))
+	var was := _suspend_regen
+	_suspend_regen = true
+	length_slider.value = roundf(float(f["wealth"]) * 100.0)
+	upkeep_slider.value = float(f["upkeep"])
+	_suspend_regen = was
+
+
 ## Show what the chosen region can be blended with, and say the share and
 ## coherence in words. Hidden for every kind but a village.
 func _sync_vernacular() -> void:
 	var village := _kind() == VILLAGE
+	place_label.visible = village
+	place_opt.visible = village
+	var placed := village and _picked(place_opt) != &""
+	# a place is the whole vernacular: the region pickers stand down
+	region_label.visible = village and not placed
+	region_opt.visible = village and not placed
+	if placed:
+		for control in [blend_label, blend_opt, roofs_label, roofs_opt, paint_label, paint_opt,
+				share_label, share_slider, coherence_label, coherence_slider]:
+			control.visible = false
+		return
 	var regional := village and _picked(region_opt) != &""
 	var second := _picked(blend_opt)
 	var blended := regional and second != &"" and second != _picked(region_opt)

@@ -798,6 +798,9 @@ class VillageFamily extends BuildingFamilyAdapter:
 		spec.decoration_level = request.decoration_level
 		spec.upkeep = request.upkeep
 		spec.vernacular = request.vernacular.duplicate(true)
+		# VILLAGE-PLACE: what the place says of the village itself (wealth,
+		# upkeep, water, purpose, defence) is laid over the request's own
+		VillagePlace.apply(spec)
 		_copy_orientation_and_period(request, spec)
 		if not spec.valid():
 			return false

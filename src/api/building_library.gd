@@ -343,7 +343,11 @@ static func describe(kind: StringName) -> Dictionary:
 			"min_label": "Worn / slum", "max_label": "Clean"}
 		# VILLAGE-VERNACULAR: the regions a `vernacular` blend may name, the
 		# groups it may weight one by one, and what each region is held to
+		# VILLAGE-PLACE: `place` is the feature set a village can be described
+		# by instead of a region -- every feature with its range and meaning,
+		# and the presets as named points in that space
 		out["vernacular"] = {"label": "Regional character", "default": {},
+			"place": VillagePlace.describe(),
 			"regions": VillageVernacular.describe(), "groups": VillageVernacular.GROUPS,
 			"coherence": {"min": 0.0, "max": 1.0, "value": 0.0,
 				"min_label": "One hybrid people", "max_label": "Peoples side by side"}}
