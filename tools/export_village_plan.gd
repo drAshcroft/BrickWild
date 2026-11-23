@@ -58,11 +58,14 @@ extends SceneTree
 ## (BG-012-EARLY-REFUSE, docs/VILLAGE_TERRAIN.md "Refusing early"): with
 ## `--terrain`, a cheap capacity estimate runs before the lot search and skips
 ## it when the dry, climbable ground cannot hold the programme. The search is
-## also bounded: `--search-budget-s N` (wall seconds of lot search, default
-## 1200, 0 for none) and `--search-attempts N` (re-plans, default 0 = none).
+## also bounded: `--search-attempts N` (re-plans, default
+## SEARCH_ATTEMPTS_DEFAULT; the same plan on any machine, BG-018) and
+## `--search-budget-s N` (wall seconds of lot search, default 0 = none).
 ## A refused request still writes `--out`: the best partial plan, plus a
-## `refused` block {reason, stopped, requested, placed, unplaced[], capacity,
-## search}. `capacity.rules` names what removed the room (wet, cliff) in m2.
+## `refused` block {reason, stopped, requested, placed, unplaced[],
+## unplaced_why[], capacity, search}. `capacity.rules` names what removed the
+## room (wet, cliff) in m2; `unplaced_why` names, per building left out, the
+## lot rules that refused its candidate lots and how often (BG-018).
 ##
 ## The caller may say what the city's people BUILD LIKE (VXG-PLACE-EXPORT,
 ## docs/VILLAGE_PLACE.md): `--vernacular <file.json>`, or the JSON itself when
@@ -106,10 +109,15 @@ const PLACES := 0.001
 ## The site is capped at BrickWild's own maximum however big a cell is.
 const SITE_MAX_M := 400.0
 const BUILDING_MAX := 140
-## Wall seconds the lot search may spend, when the caller says nothing. The
-## flat 21-building city took 261 s in all; the same city on a 720 m grid took
-## 2562 s and still did not fit.
-const SEARCH_BUDGET_DEFAULT_S := 1200.0
+## The lot search's budget when the caller says nothing: re-plans, not wall
+## seconds (BG-018). A wall budget is spent faster by three exporters sharing a
+## machine than by one alone, so the same request was planned or refused by
+## the load; a re-plan count gives the same plan on any machine. The hardest
+## city that fits used 41 (Yapoommooloo, flat, 2026-11-22); a refusal stops
+## here or sooner, when the ladder runs out. `--search-budget-s N` still adds a
+## wall cap for a caller who wants one; 0 is none.
+const SEARCH_BUDGET_DEFAULT_S := 0.0
+const SEARCH_ATTEMPTS_DEFAULT := 60
 
 
 func _init() -> void:
@@ -167,7 +175,7 @@ func _init() -> void:
 		return
 	spec.terrain = ground
 	spec.search_budget_s = float(String(opts.get("search-budget-s", "%f" % SEARCH_BUDGET_DEFAULT_S)))
-	spec.search_max_attempts = int(String(opts.get("search-attempts", "0")))
+	spec.search_max_attempts = int(String(opts.get("search-attempts", str(SEARCH_ATTEMPTS_DEFAULT))))
 	if not spec.valid():
 		printerr("SiteRequest does not map to a village: %s" % ", ".join(spec.errors()))
 		quit(3)
@@ -326,16 +334,97 @@ static func refusal(plan: VillagePlan, programme: Array[BuildingRequest], reques
 			named.append("%s %.0f m2 (%.1f %%)" % [r["rule"], float(r["removed_m2"]), float(r["share"]) * 100.0])
 		parts.append("ground removed from the largest site of %.0f m2: %s; %.0f m2 more is steep but climbable" % [
 			float(capacity.get("envelope_m2", 0.0)), ", ".join(named), float(capacity.get("steep_m2", 0.0))])
+	var why: Array = unplaced_why(plan, programme)
+	for k in range(mini(why.size(), BUILDINGS_SAID)):
+		parts.append(String(why[k]["says"]))
+	if why.size() > BUILDINGS_SAID:
+		parts.append("and %d more (unplaced_why)" % (why.size() - BUILDINGS_SAID))
 	return {
 		"reason": "; ".join(parts),
 		"stopped": stopped if stopped != "" else "exhausted",
 		"requested": requested,
 		"placed": plan.buildings.size(),
 		"unplaced": unplaced_labels(programme, plan),
+		"unplaced_why": why,
 		"capacity": capacity.duplicate(true),
 		"search": {"attempts": int(search.get("attempts", 0)),
 			"elapsed_s": float(search.get("elapsed_s", 0.0))},
 	}
+
+
+## BG-018: what each rule of the lot planner means, for a refusal a person
+## reads. The keys are the rule names `VillageLotPlanner._no` counts under.
+const RULE_WORDS := {
+	"site_edge": "the lot would cross the site's edge",
+	"across_a_road": "the lot would lie across a road",
+	"on_the_common": "the lot would lie on the common",
+	"in_water": "the lot would lie in water",
+	"wet_ground": "the ground under the lot is wet",
+	"cliff": "the ground under the lot is a cliff (steeper than a footpath)",
+	"plot_too_steep": "the terraced plot is steeper on the mean than a footpath",
+	"landmark_slot": "the lot would take the plot reserved for the landmark",
+	"another_lot": "another lot is in the way",
+	"crest_high_ground": "the crest's high ground is the church's",
+	"corner_of_a_greater_road": "the corner belongs to a greater road",
+	"lane_short_of_door": "its lane ends short of its door",
+	"well": "it would stand on the well",
+	"walls_off_lot": "its walls would not fit inside the lot",
+	"eaves_over_road": "its eaves would hang over a carriageway",
+	"fire_gap": "a neighbour stands inside its fire gap",
+	"door_into_a_back_wall": "its door would face a neighbour's back wall",
+	"civic_off_the_square": "its front would be more than 14 m from the square",
+	"farm_off_the_edge": "a farm belongs at the edge",
+	"stable_far_from_inn": "a stable belongs within 20 m of its inn",
+	"inn_off_the_crossing": "the inn belongs on the crossing",
+	"shore_row": "the shore's row is full, or the lot is off it",
+	"mill_bank": "the mill needs its bank",
+	"mill_race": "the mill has no race",
+	"mine_workyard": "the mine's working ground is beyond the last gate",
+	"ground_falls_too_far": "the ground falls further under its walls than its family stands on",
+	"no_way_down_to_the_ground": "its steps or terrace cannot reach the ground",
+	"steps_or_terrace_off_the_lot": "its steps, terrace or talus would leave its lot",
+	"its_road_is_full": "the road it insists on has no room left",
+	"no_road_of_its_class": "the plan has no road of the class it insists on",
+	"seat_gate_off_the_common": "its gate would not look toward the common",
+	"own_lane_no_room": "there is no room for a lane of its own",
+	"site_too_narrow_for_its_lane": "the site is too narrow for its lane and lot between the common and the edge",
+	"own_lane_too_steep": "a lane of its own would be steeper than a cart climbs",
+	"own_lane_across_the_common": "a lane of its own would cross the common",
+	"own_lane_across_the_landmark": "a lane of its own would cross the landmark's plot",
+	"own_lane_into_water": "a lane of its own would run into water",
+	"own_lane_across_a_lot": "a lane of its own would cross a lot",
+	"own_lane_across_a_road": "a lane of its own would cross a road",
+	"budget_spent": "the search budget was spent before it was tried",
+}
+## How many rules a refusal's sentence names per building, most refusals first,
+## and how many buildings it names; `unplaced_why` always holds every one.
+const RULES_SAID := 3
+const BUILDINGS_SAID := 4
+
+
+## One row per building the kept plan could not place (`VillagePlan.unplaced`):
+## {building (as `unplaced` labels it), class, footprint_m, rules: [{rule,
+## refused, means}], says}. `refused` counts candidate lots (or lanes) of the
+## last search, so the first rule is the one to look at.
+static func unplaced_why(plan: VillagePlan, programme: Array[BuildingRequest]) -> Array:
+	var out: Array = []
+	for row in plan.unplaced:
+		var order: int = int(row["order"])
+		var label: String = _label(plan.spec, programme[order]) if order >= 0 and order < programme.size() \
+			else "%s/%s" % [row["kind"], row["purpose"]]
+		var rules: Array = []
+		var said: Array[String] = []
+		for r in row["rules"]:
+			var means: String = String(RULE_WORDS.get(String(r["rule"]), String(r["rule"])))
+			rules.append({"rule": String(r["rule"]), "refused": int(r["refused"]), "means": means})
+			if said.size() < RULES_SAID:
+				said.append("%s (%d)" % [means, int(r["refused"])])
+		var says: String = "%s (%.0f x %.0f m) found no lot: %s" % [label, float(row["width_m"]),
+			float(row["depth_m"]), ", ".join(said) if not said.is_empty() else "no candidate was tried"]
+		out.append({"building": label, "class": String(row["class"]),
+			"footprint_m": [_n(float(row["width_m"])), _n(float(row["depth_m"]))],
+			"rules": rules, "says": says})
+	return out
 
 
 ## What the programme asked for and the plan did not place, as `kind/purpose`.

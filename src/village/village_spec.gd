@@ -318,6 +318,23 @@ func civic_population() -> int:
 	return mini(implied_population, CIVIC_MAX)
 
 
+## A town SHOWN SMALL (BG-017): its civic programme is sized for more people
+## than its streets are. Its square is then sized for the civic programme and
+## ringed by straight streets (`VillageSitePlanner._common_area`,
+## `_plan_street`); every spec without a larger implied population plans
+## exactly as before.
+func shown_small() -> bool:
+	return civic_population() > population
+
+
+## The households the square is laid for: the shown ones, or the civic
+## population's when the town is shown small.
+func civic_households() -> int:
+	if not shown_small():
+		return households
+	return maxi(households, int(round(float(civic_population()) / PEOPLE_PER_HOUSEHOLD)))
+
+
 func valid() -> bool:
 	return errors().is_empty()
 

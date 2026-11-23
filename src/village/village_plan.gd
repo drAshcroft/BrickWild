@@ -120,6 +120,12 @@ var island: Dictionary = {}
 ## "capacity": VillageCapacity.estimate (or {})}. Empty for a plan that was
 ## not made by `VillageLotPlanner.plan_measured`.
 var search: Dictionary = {}
+## BG-018: the buildings the lot planner could not place on this plan, one row
+## each: {order, kind, purpose, class, width_m, depth_m, rules: [{rule,
+## refused}]}, the rules that refused its candidate lots, most first. Empty on
+## a plan that placed everything. Not part of `equals`: it describes the
+## search, not the village.
+var unplaced: Array[Dictionary] = []
 
 
 ## The ground readings of this plan are taken on: `ground` when the village

@@ -2219,7 +2219,8 @@ seat's head-clearing and the finer width steps, each a whole `cut_measured`
   plan so far is kept. `plan.search` = `{attempts, elapsed_s, stopped, capacity}`,
   `stopped` one of `""`, `capacity`, `budget_time`, `budget_attempts`.
 - **Exporter.** `--search-budget-s N` (default 1200, 0 none) and
-  `--search-attempts N` (default 0). A refused request (exit 3) now also writes
+  `--search-attempts N` (default 0); since BG-018 the defaults are 0 seconds
+  and 60 re-plans, see the next section. A refused request (exit 3) now also writes
   `--out`: the partial plan plus `refused` = `{reason, stopped, requested,
   placed, unplaced[], capacity, search}`; `capacity.rules` is
   `[{rule: wet|cliff, removed_m2, share}]` of `envelope_m2`, with `usable_m2`,
@@ -2231,6 +2232,100 @@ Suites: `vterrain` (`_capacity`: dry, drowned, wall and strip ground on
 hand-made jobs; 178 checks) and `lane:village-terrain` (`_estimate_spares`: no
 fixture that plans is refused; `_refusals`: drowned and wall ground refuse in
 3 s with the rule named, and the 1-attempt and 1 ms budgets return a partial).
+
+## The town shown small, and the buildings with no lot (BG-017, BG-018)
+
+VoxelGames, 2026-11-22, release 0.1.8: three cities of the re-baked world,
+shown at 30 to 60 people and implied at two to eight million (civic 500), were
+refused. Flat, Wuuñafu left its seat or its guildhall out and Thaanñafu its
+town hall and guildhall ("no frontage for the rest"); on their own ground all
+three lost a temple or a castle and ran out the 1200 s wall budget.
+
+**Why a building found no lot.** Every refusal of a candidate lot, or of a
+lane of a building's own, is counted under the rule that made it
+(`VillageLotPlanner._no`): `across_a_road`, `site_edge`, `civic_off_the_square`,
+`fire_gap`, `own_lane_across_a_lot`, ... thirty-odd names, the exporter's
+`RULE_WORDS`. The jobs a cut could not place keep their counts on the plan,
+`VillagePlan.unplaced` = `[{order, kind, purpose, class, width_m, depth_m,
+rules: [{rule, refused}]}]`, most refusals first. A refusal's `refused` block
+carries them as `unplaced_why` (`{building, class, footprint_m, rules: [{rule,
+refused, means}], says}`), and its `reason` sentence names the first three for
+each building. `plan.search.cuts` records every cut the ladder made: its site,
+its road count and what each left out with its two top rules. Counting never
+changes what is placed.
+
+**`tools/probe_site_refusal.gd`** plans a request the way the exporter does and
+prints the programme as measured, every cut and the rules, in seconds instead
+of the exporter's minutes: `--cache DIR` keeps every measured placement (and a
+church's or castle's measurement on each fall), so a second run measures
+nothing flat. `--out summary.json` writes the plan's geometry for
+`tools/settlements/draw_refusal.py summary.json picture.png`.
+
+What the rules said, and what changed:
+
+- **The square of a town shown small** (BG-017). The common was sized by the
+  shown households (10 of them: 18 x 11 m) while the hall, the guildhall, the
+  temple and a church all front it; the `street`/`gate` ring is an octagon
+  round the common's diagonal, so its north chords stand past §9.4's 14 m
+  reach. Thaanñafu's town hall: 705 lots refused `civic_off_the_square`, 455
+  `across_a_road`. Now `VillageSpec.shown_small()` (civic population above the
+  shown one) sizes the common by `civic_households()` (`_common_area`), and a
+  `street` or `gate` town shown small takes the `green` layout: three straight
+  streets four metres off the common, closed by the through road. A spec
+  without a larger implied population plans exactly as before.
+- **Depth, not frontage** (BG-018, and Yapoommooloo flat once its square
+  grew). The ladder only ever widened the site along the road. Three 40 x 52 m
+  castles and a temple on a 185 m deep site: with the field tracks the seat
+  found no lane; with the head cleared, a monument found no plot. When only
+  deep buildings are left (`church`, `manor`, `monument`), the site now grows
+  ACROSS the road, half the deepest lot at a time (`DEPTH_STEPS`), at the width
+  already kept, with the head cleared too when there is a seat. A plan that
+  placed everything never comes there.
+- **A planted town's seat** (`_place_manor_outside`). A planted grid closes
+  round the through road: every lane the seat could take off it runs into a
+  block forty metres deep (Yapoommooloo on its ground: 6754 lots across a road,
+  6264 over the site edge). Once the through road's lanes are spent, a planted
+  town's seat takes a lane off the outermost street on either side, leaning
+  nearly along it so its gate still looks toward the square.
+- **A temple's pad** (`VillageLotGround.level_pad_max`). A temple is not a
+  church on the ground: `fall_limit` gives it no fall, so it stands on a level
+  pad, which might cut or fill 1.2 m. Under a 28 x 58 m temple on Yapoommooloo's
+  bumpy, nearly level ground the best spots read 1.3 to 1.5 m (the probe's
+  `--detail 1` names the pad each lot was refused on). The pad now takes up to a
+  sixteenth of the footprint's shorter side, never less than 1.2 m: 1.6 m for
+  this temple; nothing under 19.2 m wide changes.
+- **Repeated cuts** (`_seen`). A width past the 400 m cap asked for at two
+  scales, and extra lanes a site had no room for, gave the same site twice; a
+  third of Yapoommooloo's cuts were repeats, forty seconds each on ground. A
+  re-plan identical to a site already cut is not cut again (`search.repeats`).
+- **The exporter's budget is re-plans** (`SEARCH_ATTEMPTS_DEFAULT`), not wall
+  seconds: three exporters on one machine each got fewer re-plans out of 1200 s
+  than one alone. `--search-budget-s` still adds a wall cap; its default is now
+  0, none.
+
+Measured with the probe, `{"place": {"like": "rhine_town", "stone": 0.8,
+"inequality": 0.8}}`, civic 500 (artifacts/bg017/):
+
+| city | shown | flat, 0.1.8 | flat, now | own ground, 0.1.8 code | own ground, now |
+|---|---|---|---|---|---|
+| Yapoommooloo | 60 | 29/29 | 29/29, 374 x 234 m | 27/29 (temple, seat) | 29/29, 299 x 261 m, 30 re-plans |
+| Wuuñafu | 60 | 27/28 (guildhall) | 28/28 | 28/28 | 28/28, the same plan |
+| Wuuñafu | 45 | 22/23 (seat) | 23/23 | | |
+| Thaanñafu | 45 | 20/22 (hall, guildhall) | 22/22 | 19/22 (hillside: temple, seat, great-tomb) | open, BG-018-HILLSIDE-GREAT |
+| Thaanñafu | 30 | 16/18 (hall, guildhall) | 18/18 | | |
+
+The repeat skip left every flat plan byte-identical and saved 8 to 19 cuts a
+city. On ground nearly all the time is measuring the church, temple and
+castles anew on each fall they are asked to stand on: Wuuñafu's ground plan
+took 1752 s with nothing measured and 81 s with the probe's cache warm.
+
+**Open: a hillside town's great buildings** (BG-018-HILLSIDE-GREAT).
+Thaanñafu's ground takes the `hillside` form: its road and three terraces,
+30 to 44 m apart, fill the top half of a 400 m site, and no lot between them is
+68 m deep; the lower half, at about 8 %, is empty and no road reaches it. The
+depth steps cannot help at the 400 m cap. Next: an "outside" lane for every
+deep class off the outermost terrace, away from the common, as
+`_place_manor_outside` does for a planted seat.
 
 ## Visual check (2026-10-28)
 

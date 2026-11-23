@@ -46,8 +46,19 @@ const DOOR_RISE_PREFERRED := GroundFall.PLINTH_MAX
 ## Graded ground this far from the natural ground at a lot's edge is a wall.
 const TERRACE_MIN := 0.6
 ## A family that stands on no fall at all (a temple, a mill...) stands on a
-## level pad; the pad may cut or fill this much at most.
+## level pad; the pad may cut or fill this much at most...
 const LEVEL_PAD_MAX := 1.2
+## ...or, under a big footprint, this much a metre of its SHORTER side
+## (`level_pad_max`). A 28 x 58 m temple read 1.3 to 1.5 m of cut or fill
+## at its best spots on Yapoommooloo's bumpy, nearly level ground, and found no
+## lot at 1.2 m (BG-018); a temple that size stands on a podium (the Maison
+## Carree's is 2.85 m under a 15 m front). Below 19.2 m nothing changes.
+const LEVEL_PAD_PER_M := 1.0 / 16.0
+
+
+## The most a level pad may cut or fill under a `width` x `length` footprint.
+static func level_pad_max(width: float, length: float) -> float:
+	return maxf(LEVEL_PAD_MAX, LEVEL_PAD_PER_M * minf(width, length))
 ## Sample spacing under a footprint.
 const SAMPLE_M := 1.5
 ## Samples this close to the uphill edge do not set the fall: the natural
@@ -163,7 +174,8 @@ static func reading(ground: VillageTerrain, request: BuildingRequest, xf: Transf
 static func refusal(request: BuildingRequest, r: Dictionary) -> String:
 	var limit := fall_limit(request)
 	if limit <= 0.0:
-		if float(r["cut_m"]) > LEVEL_PAD_MAX or float(r["fill_m"]) > LEVEL_PAD_MAX:
+		var pad_max: float = level_pad_max(float(r["width"]), float(r["length"]))
+		if float(r["cut_m"]) > pad_max or float(r["fill_m"]) > pad_max:
 			return "a level pad would cut %.1f m and fill %.1f m" % [float(r["cut_m"]), float(r["fill_m"])]
 		return ""
 	return GroundFall.refusal(float(r["fall_m"]), float(r["width"]), float(r["length"]),

@@ -687,6 +687,15 @@ static func bow(points: PackedVector2Array) -> float:
 ## common shrinks to the well and the village is a hamlet.
 static func _plan_street(out: VillagePlan, spec: VillageSpec, through: PackedVector2Array,
 		rng: RandomNumberGenerator) -> void:
+	if spec.shown_small():
+		# BG-017: a town shown small has a square, and a square's frontage is
+		# its four straight sides. The ring below is an octagon round the
+		# common's DIAGONAL: on a square for a town its northern chords stand
+		# twenty metres off the common, past §9.4's fourteen-metre reach, and a
+		# hall on them fronts nothing. The green's ring is three straight
+		# streets four metres off its edges, closed by the through road.
+		_plan_green(out, spec, through)
+		return
 	var site: Rect2 = out.site
 	var hamlet: bool = spec.population < HAMLET_POPULATION
 	var target: float = HAMLET_COMMON_AREA if hamlet else _common_area(spec, site)
@@ -1326,7 +1335,10 @@ static func _plan_green(out: VillagePlan, spec: VillageSpec, through: PackedVect
 ## §9.1's common: >= 150 m^2, growing a little with the households that have
 ## to stand on it, capped so it never eats the site.
 static func _common_area(spec: VillageSpec, site: Rect2) -> float:
-	var want: float = COMMON_MIN_AREA + float(spec.households) * 6.0
+	# a town shown small keeps the square of the town it is (BG-017): the hall,
+	# the guildhall, the temple and the church all front it, and a green sized
+	# for ten households has one side for each of two of them
+	var want: float = COMMON_MIN_AREA + float(spec.civic_households()) * 6.0
 	return clampf(want, COMMON_MIN_AREA, site.size.x * site.size.y * 0.10)
 
 
