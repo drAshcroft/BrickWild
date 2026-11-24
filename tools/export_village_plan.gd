@@ -67,6 +67,32 @@ extends SceneTree
 ## room (wet, cliff) in m2; `unplaced_why` names, per building left out, the
 ## lot rules that refused its candidate lots and how often (BG-018).
 ##
+## A caller that SHAPES ITS OWN GROUND says so (CITY-GROUND-CONTRACT,
+## docs/VILLAGE_TERRAIN.md "The caller shapes the ground"): `--ground-policy
+## shape`, with `--terrain`. A game that builds its terrain will cut and fill,
+## so the ground as given is where the plan starts, not a limit on it:
+##
+##   * THE WHOLE PROGRAMME STANDS. When the lot search leaves a building out,
+##     the plan is made again on the same land keeping less of its relief
+##     (`VillageGroundEasing`: 1, 0.5, 0.25, 0.1, 0 by default, or
+##     `--keep-relief 1,0.5,0`), the shoreline and the grid's edge untouched,
+##     and the first ground that holds every building is the plan's. Only a
+##     programme that does not fit level ground is still refused (exit 3).
+##   * THE FINISHED GROUND IS WRITTEN, not described. `earthworks.finished`
+##     names a height grid (`--ground-out`, default `<out>.ground.json` and its
+##     `.r32`) of the site as BrickWild built on it: every lot graded, every
+##     road bed and stair cut, in the plan's frame. `earthworks.eased.lift`
+##     names the metres to add to the given ground where the land was eased
+##     (`--lift-out`, default `<out>.lift.json`). A consumer that lays both
+##     into its terrain has the ground the flights, plinths, props and the 3D
+##     walk were planned on; one that levels its own pads does not.
+##
+## `--measure-cache DIR` keeps the programme's measurements between runs
+## (`VillageMeasureCache`): a re-bake of a city on its ground is then the lot
+## search alone. Keep one directory per release; in a working tree delete it
+## after changing a builder. Without `--ground-policy` and `--measure-cache`
+## nothing here runs and the output is byte-identical to before.
+##
 ## The caller may say what the city's people BUILD LIKE (VXG-PLACE-EXPORT,
 ## docs/VILLAGE_PLACE.md): `--vernacular <file.json>`, or the JSON itself when
 ## the value starts with `{`. The content is a `VillageSpec.vernacular`: a
@@ -118,13 +144,19 @@ const BUILDING_MAX := 140
 ## wall cap for a caller who wants one; 0 is none.
 const SEARCH_BUDGET_DEFAULT_S := 0.0
 const SEARCH_ATTEMPTS_DEFAULT := 60
+## What the caller does with the ground it gave (`--ground-policy`): KEEP it as
+## it lies, so the plan fits it or is refused; or SHAPE it to the plan
+## (CITY-GROUND-CONTRACT), so the ground is eased until the whole programme
+## stands and the finished ground is written out for the caller to make.
+const GROUND_KEEP := "keep"
+const GROUND_SHAPE := "shape"
 
 
 func _init() -> void:
 	var args: PackedStringArray = OS.get_cmdline_user_args()
 	var opts: Dictionary = _options(args)
 	if not opts.has("request") or not opts.has("out"):
-		printerr("usage: --request <in.json> --out <out.json> [--population <people>] [--implied-population <people>] [--terrain <grid.json>] [--vernacular <vernacular.json> | '{\"place\": ...}'] [--search-budget-s <s>] [--search-attempts <n>]  (absolute paths: --path changes the working directory)")
+		printerr("usage: --request <in.json> --out <out.json> [--population <people>] [--implied-population <people>] [--terrain <grid.json>] [--vernacular <vernacular.json> | '{\"place\": ...}'] [--search-budget-s <s>] [--search-attempts <n>] [--ground-policy keep|shape] [--keep-relief 1,0.5,...] [--ground-out <grid.json>] [--lift-out <grid.json>] [--measure-cache <dir>]  (absolute paths: --path changes the working directory)")
 		quit(2)
 		return
 	var text: String = _read(opts["request"])
@@ -159,50 +191,52 @@ func _init() -> void:
 		vernacular = read["vernacular"]
 	var request: Dictionary = with_implied_population(
 		with_caller_population(parsed, population_arg, notes), implied_arg)
-	var spec: VillageSpec = spec_from_request(request, text, notes)
 	var brief_errors: Array[String] = request_errors(request)
 	if not brief_errors.is_empty():
 		printerr("SiteRequest refused: %s" % "; ".join(brief_errors))
 		quit(3)
 		return
-	if not vernacular.is_empty():
-		apply_vernacular(spec, vernacular, request, notes)
-	var ground: VillageTerrain = terrain_from_request(request,
+	var given: VillageTerrain = terrain_from_request(request,
 		String(opts["request"]).get_base_dir(), String(opts.get("terrain", "")))
-	if ground != null and not ground.valid():
-		printerr("SiteRequest refused: terrain %s" % "; ".join(ground.errors()))
+	if given != null and not given.valid():
+		printerr("SiteRequest refused: terrain %s" % "; ".join(given.errors()))
 		quit(3)
 		return
-	spec.terrain = ground
-	spec.search_budget_s = float(String(opts.get("search-budget-s", "%f" % SEARCH_BUDGET_DEFAULT_S)))
-	spec.search_max_attempts = int(String(opts.get("search-attempts", str(SEARCH_ATTEMPTS_DEFAULT))))
-	if not spec.valid():
-		printerr("SiteRequest does not map to a village: %s" % ", ".join(spec.errors()))
+	# CITY-GROUND-CONTRACT: a caller that cuts and fills its own ground is
+	# planned on gentler ground, a step at a time, until every building stands
+	var policy: String = String(opts.get("ground-policy", GROUND_KEEP))
+	var ladder: Array[float] = keep_ladder(policy, String(opts.get("keep-relief", "")))
+	if ladder.is_empty() or (policy == GROUND_SHAPE and given == null):
+		var steps: Array[String] = []
+		for k in VillageGroundEasing.LADDER:
+			steps.append(String.num(k, 2))
+		printerr("--ground-policy is '%s' or '%s'; '%s' needs the ground (--terrain), and --keep-relief is numbers from 1 down to 0 (default %s)" % [
+			GROUND_KEEP, GROUND_SHAPE, GROUND_SHAPE, ",".join(steps)])
+		quit(2)
+		return
+	var cache: VillageMeasureCache = null
+	if opts.has("measure-cache") or policy == GROUND_SHAPE:
+		cache = VillageMeasureCache.new(String(opts.get("measure-cache", "")))
+	var shaped: Dictionary = plan_shaped(request, text, vernacular, given, ladder, opts, notes, cache,
+		policy == GROUND_SHAPE)
+	var got: Dictionary = shaped["got"]
+	var tried: Array = shaped["tried"]
+	if cache != null:
+		cache.save()
+	if got.is_empty():
+		printerr(String(shaped["failed"]))
 		quit(3)
 		return
-	spec.generate(spec.seed)
-	var intent_note := form_intent_note(spec)
-	if not intent_note.is_empty():
-		notes.append(intent_note)
-	var plan: VillagePlan = VillageLotPlanner.plan(spec)
-	if plan.roads.is_empty():
-		printerr("SiteRequest refused: no roads could be planned for form '%s'" % String(spec.form))
-		quit(3)
-		return
-	if plan.site.size.x > spec.requested_site_m + 0.01 or plan.site.size.y > spec.requested_site_m + 0.01:
-		printerr("SiteRequest refused: population %d needs %.1f x %.1f m, beyond %.1f m terrain envelope" % [
-			spec.population, plan.site.size.x, plan.site.size.y, spec.requested_site_m])
-		quit(3)
-		return
-	var programme: Array[BuildingRequest] = VillageProgrammer.programme(spec)
+	var spec: VillageSpec = got["spec"]
+	var plan: VillagePlan = got["plan"]
+	var programme: Array[BuildingRequest] = got["programme"]
+	var ground: VillageTerrain = spec.terrain
+	notes = got["notes"]
 	var requested_buildings: int = programme.size()
-	if requested_buildings > BUILDING_MAX:
-		printerr("SiteRequest refused: %d buildings exceeds site capacity %d" % [
-			requested_buildings, BUILDING_MAX])
-		quit(3)
-		return
 	if plan.buildings.size() < requested_buildings:
 		var refused: Dictionary = refusal(plan, programme, requested_buildings)
+		if policy == GROUND_SHAPE:
+			refused["ground_tried"] = tried
 		printerr("SiteRequest refused: only %d of %d requested buildings fit in %.1f m (unplaced: %s; planned site %.0f x %.0f m)" % [
 			plan.buildings.size(), requested_buildings, spec.requested_site_m,
 			", ".join(unplaced_labels(programme, plan)), plan.site.size.x, plan.site.size.y])
@@ -214,8 +248,7 @@ func _init() -> void:
 			add_vernacular(partial, plan, false)
 		var pf := FileAccess.open(opts["out"], FileAccess.WRITE)
 		if pf != null:
-			pf.store_string(JSON.stringify(partial, "	", true) + "
-")
+			pf.store_string(JSON.stringify(partial, "\t", true) + "\n")
 			pf.close()
 			printerr("  partial plan (%d buildings) and the refusal written to %s" % [plan.buildings.size(), opts["out"]])
 		quit(3)
@@ -232,6 +265,15 @@ func _init() -> void:
 		if plan.ground != null:
 			notes.append(siting_note(plan))
 		notes.append(ground_note(out))
+	if policy == GROUND_SHAPE:
+		var works: Dictionary = write_earthworks(plan, given, got["eased"], tried, String(opts["out"]),
+			String(opts.get("ground-out", "")), String(opts.get("lift-out", "")))
+		if works.has("error"):
+			printerr(String(works["error"]))
+			quit(2)
+			return
+		out["earthworks"] = works
+		notes.append(earthworks_note(works))
 	if not vernacular.is_empty():
 		add_vernacular(out, plan, true)
 		var vc: Dictionary = out["vernacular_check"]
@@ -253,6 +295,179 @@ func _init() -> void:
 		(out["lots"] as Array).size(), (out["roads"] as Array).size(),
 		out["site"]["width_m"], out["site"]["depth_m"], opts["out"]])
 	quit(0)
+
+
+## The request planned on each ground of `ladder` in turn -- shares of the
+## given relief kept (`VillageGroundEasing.eased`), first to last -- until one
+## holds the whole programme (CITY-GROUND-CONTRACT). One rung, 1.0, is the
+## plan on the ground as given; `given` null plans flat.
+##   {"got": the `plan_on` result that placed most, with the ground it was
+##           made on as "eased"; {} when no rung could be planned at all,
+##    "tried": [{keep_relief, form, requested, placed, re_plans}] a rung,
+##    "failed": the last rung's error, or ""}
+## `say` prints a line a rung.
+static func plan_shaped(request: Dictionary, text: String, vernacular: Dictionary, given: VillageTerrain,
+		ladder: Array[float], opts: Dictionary, base_notes: Array[String], cache: VillageMeasureCache,
+		say := false) -> Dictionary:
+	var got := {}
+	var tried: Array = []
+	var failed := ""
+	for keep in ladder:
+		var t0 := Time.get_ticks_msec()
+		var eased: Dictionary = VillageGroundEasing.eased(given, keep) if given != null else {}
+		var rung: Dictionary = plan_on(request, text, vernacular, eased.get("terrain", null), opts, base_notes, cache)
+		if rung.has("error"):
+			failed = String(rung["error"])
+			continue
+		rung["eased"] = eased
+		var plan: VillagePlan = rung["plan"]
+		var asked: int = (rung["programme"] as Array).size()
+		tried.append({"keep_relief": _n(keep), "form": String(plan.spec.form), "requested": asked,
+			"placed": plan.buildings.size(), "re_plans": int(plan.search.get("attempts", 0))})
+		if say:
+			print("  ground kept at %s of its relief: %d of %d buildings, form %s, %d re-plans, %.0f s" % [
+				String.num(keep, 2), plan.buildings.size(), asked, plan.spec.form,
+				int(plan.search.get("attempts", 0)), float(Time.get_ticks_msec() - t0) / 1000.0])
+		if got.is_empty() or plan.buildings.size() > (got["plan"] as VillagePlan).buildings.size():
+			got = rung
+		if plan.buildings.size() >= asked:
+			break
+	return {"got": got, "tried": tried, "failed": failed}
+
+
+## One plan of the request on `ground` (null: flat): the spec that the request,
+## the caller's sizes and the vernacular make, generated and planned. `cache`
+## (or null) keeps the programme's measurements between plans.
+## {"spec", "plan", "programme", "notes"}, or {"error"} for a request that
+## cannot be planned at all.
+static func plan_on(request: Dictionary, text: String, vernacular: Dictionary, ground: VillageTerrain,
+		opts: Dictionary, base_notes: Array[String], cache: VillageMeasureCache) -> Dictionary:
+	var notes: Array[String] = base_notes.duplicate()
+	var spec: VillageSpec = spec_from_request(request, text, notes)
+	if not vernacular.is_empty():
+		apply_vernacular(spec, vernacular, request, notes)
+	spec.terrain = ground
+	spec.search_budget_s = float(String(opts.get("search-budget-s", "%f" % SEARCH_BUDGET_DEFAULT_S)))
+	spec.search_max_attempts = int(String(opts.get("search-attempts", str(SEARCH_ATTEMPTS_DEFAULT))))
+	if not spec.valid():
+		return {"error": "SiteRequest does not map to a village: %s" % ", ".join(spec.errors())}
+	spec.generate(spec.seed)
+	var intent_note := form_intent_note(spec)
+	if not intent_note.is_empty():
+		notes.append(intent_note)
+	var programme: Array[BuildingRequest] = []
+	var plan: VillagePlan = null
+	if cache == null:
+		# exactly what the exporter always did, in the order it did it
+		plan = VillageLotPlanner.plan(spec)
+		programme = VillageProgrammer.programme(spec)
+	else:
+		programme = VillageProgrammer.programme(spec)
+		plan = VillageLotPlanner.plan_measured(spec, cache.jobs_for(programme, ground != null))
+	if plan.roads.is_empty():
+		return {"error": "SiteRequest refused: no roads could be planned for form '%s'" % String(spec.form)}
+	if plan.site.size.x > spec.requested_site_m + 0.01 or plan.site.size.y > spec.requested_site_m + 0.01:
+		return {"error": "SiteRequest refused: population %d needs %.1f x %.1f m, beyond %.1f m terrain envelope" % [
+			spec.population, plan.site.size.x, plan.site.size.y, spec.requested_site_m]}
+	if programme.size() > BUILDING_MAX:
+		return {"error": "SiteRequest refused: %d buildings exceeds site capacity %d" % [programme.size(), BUILDING_MAX]}
+	return {"spec": spec, "plan": plan, "programme": programme, "notes": notes}
+
+
+## The grounds a plan is tried on, as shares of the given relief kept, first
+## to last: the ground as given alone unless the caller shapes its ground
+## (`--ground-policy shape`), then VillageGroundEasing's ladder or the
+## caller's own (`--keep-relief 1,0.5,0`). Empty for a policy or a list that
+## cannot be read.
+static func keep_ladder(policy: String, keep_arg: String) -> Array[float]:
+	var out: Array[float] = []
+	if policy == GROUND_KEEP:
+		out.append(1.0)
+		return out
+	if policy != GROUND_SHAPE:
+		return out
+	if keep_arg.is_empty():
+		return VillageGroundEasing.LADDER.duplicate()
+	for part in keep_arg.split(",", false):
+		var text: String = part.strip_edges()
+		if not text.is_valid_float() or float(text) < 0.0 or float(text) > 1.0 \
+				or (not out.is_empty() and float(text) >= out[-1]):
+			return [] as Array[float]
+		out.append(float(text))
+	return out
+
+
+## The ground a caller that shapes its own must make, written beside the plan
+## (CITY-GROUND-CONTRACT): the FINISHED ground of the site as a height grid
+## (`VillageFinishedGround`, at `ground_path` or `<out>.ground.json`), and,
+## when the land was eased, the LIFT that eases it (`VillageGroundEasing.lift`,
+## at `lift_path` or `<out>.lift.json`). Returns the plan's `earthworks` block,
+## or {"error"} when a file cannot be written.
+static func write_earthworks(plan: VillagePlan, given: VillageTerrain, eased: Dictionary, tried: Array,
+		out_path: String, ground_path: String, lift_path: String) -> Dictionary:
+	var keep: float = float(eased.get("keep", 1.0))
+	var works := {
+		"policy": GROUND_SHAPE,
+		"keep_relief": _n(keep),
+		"tried": tried,
+		"given_fingerprint": given.fingerprint(),
+		"eased": null,
+		"finished": null,
+		"apply": "add eased.lift to your own ground where its grid lies (your grid's frame), then set the ground inside the site to finished (the plan's frame: site.anchor_m, site.yaw_deg) and blend back to it over finished.margin_m",
+	}
+	if keep < 1.0:
+		var lift: VillageTerrain = VillageGroundEasing.lift(given, eased["terrain"])
+		var lift_file: String = lift_path if not lift_path.is_empty() else out_path.get_basename() + ".lift.json"
+		if lift.save(lift_file) != OK:
+			return {"error": "cannot write %s" % lift_file}
+		works["eased"] = {
+			"datum_m": _n(float(eased["datum_m"])), "band_m": _n(float(eased["band_m"])),
+			"cut_max_m": _n(float(eased["cut_max_m"])), "fill_max_m": _n(float(eased["fill_max_m"])),
+			"cut_m3": _n(snappedf(float(eased["cut_m3"]), 1.0)), "fill_m3": _n(snappedf(float(eased["fill_m3"]), 1.0)),
+			"changed_m2": _n(float(eased["changed_m2"])),
+			"lift": {"file": lift_file.get_file(), "frame": "the given grid's own", "unit": "metres added to the given ground; negative cuts",
+				"origin_m": [_n(lift.origin.x), _n(lift.origin.y)], "cell_m": _n(lift.cell_m), "cols": lift.cols, "rows": lift.rows,
+				"fingerprint": lift.fingerprint()},
+		}
+	var finished: VillageTerrain = VillageFinishedGround.grid(plan)
+	if finished != null:
+		var ground_file: String = ground_path if not ground_path.is_empty() else out_path.get_basename() + ".ground.json"
+		if finished.save(ground_file) != OK:
+			return {"error": "cannot write %s" % ground_file}
+		var moved: Dictionary = VillageFinishedGround.moved(plan, finished)
+		works["finished"] = {
+			"file": ground_file.get_file(),
+			"frame": "the plan's: a node at plan point p stands on the given ground at site.anchor_m + p rotated by site.yaw_deg",
+			"origin_m": [_n(finished.origin.x), _n(finished.origin.y)], "cell_m": _n(finished.cell_m),
+			"cols": finished.cols, "rows": finished.rows, "margin_m": _n(VillageFinishedGround.MARGIN_M),
+			# inside this rectangle of the plan's frame the grid is the built ground;
+			# beyond it, the ground the plan was made on
+			"site_m": _rect(plan.site),
+			"cut_max_m": _n(float(moved["cut_max_m"])), "fill_max_m": _n(float(moved["fill_max_m"])),
+			"cut_m3": _n(snappedf(float(moved["cut_m3"]), 1.0)), "fill_m3": _n(snappedf(float(moved["fill_m3"]), 1.0)),
+			"changed_m2": _n(float(moved["changed_m2"])), "site_m2": _n(float(moved["site_m2"])),
+			"fingerprint": finished.fingerprint(),
+		}
+	return works
+
+
+## What the caller has to move, in one line.
+static func earthworks_note(works: Dictionary) -> String:
+	var said: Array[String] = []
+	if works["eased"] == null:
+		said.append("the whole programme stands on the ground as given")
+	else:
+		var e: Dictionary = works["eased"]
+		said.append("the whole programme stands once the land keeps %s of its relief (cut to %.1f m, fill to %.1f m about %.1f m; %s)" % [
+			String.num(float(works["keep_relief"]), 2), float(e["cut_max_m"]), float(e["fill_max_m"]), float(e["datum_m"]),
+			e["lift"]["file"]])
+	if works["finished"] == null:
+		said.append("the plan is laid out flat, so it has no finished ground: stand it on one level pad")
+	else:
+		var g: Dictionary = works["finished"]
+		said.append("the finished ground of the site is %s (lots, road beds and stairs cut to %.1f m and filled to %.1f m)" % [
+			g["file"], float(g["cut_max_m"]), float(g["fill_max_m"])])
+	return "earthworks: %s" % "; ".join(said)
 
 
 ## True when the request's `population` counts a whole polity node, not a

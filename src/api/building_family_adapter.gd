@@ -83,6 +83,19 @@ func footprint(_building) -> Rect2:
 	return Rect2()
 
 
+## What the building stands on the ground that a person walking past it must
+## go round, as polygons in the same local XZ space (BG-015-STREET-PLINTH):
+## the walls at the ground with whatever stands out of them below head height.
+## A village's 3D walk is kept off these. The default is `footprint`, for a
+## family that has not said more.
+func ground_outline(building) -> Array[PackedVector2Array]:
+	var out: Array[PackedVector2Array] = []
+	var fp: Rect2 = footprint(building)
+	if fp.has_area():
+		out.append(Poly.from_rect(fp))
+	return out
+
+
 ## Where this family's front door sits, in the same local space. Read from
 ## the plan or spec that produced the mesh, never re-detected from geometry.
 func door(_building) -> Vector3:
@@ -171,15 +184,51 @@ static func of(kind: StringName) -> BuildingFamilyAdapter:
 ## answer the same way about their footprint and their door, and only the
 ## generator and the assembler differ.
 class PlanFamily extends BuildingFamilyAdapter:
+	## HouseBuilder._build_plinth's water-table moulding is 4 cm thicker than
+	## the plinth: 2 cm more proud of the wall than the plinth's PLINTH_EXTRA.
+	const PLINTH_WATER_TABLE := 0.02
+
 	func quality_report(building) -> Dictionary:
 		return plan_quality_report(building.plan)
 
+	## NOTE: the CLEAR FLOOR inside the walls of the top storey (the site rect
+	## less a wall), not the walls' outer face, whatever the base doc says. The
+	## lot planner and every village check size on it as it is, so it stays;
+	## what a walker meets at the ground is `ground_outline` (BG-015).
 	func footprint(building) -> Rect2:
 		# HS-PUEBLO: a stepped house stands on its ground storey; the storeys above
 		# are drawn in from it
 		var level: int = 0 if building.plan.spec.terraced else maxi(building.plan.spec.storeys - 1, 0)
 		return HouseGeometry.storey_rect(building.plan, level).grow(
 			-HouseGeometry.wall_thickness(building.plan.spec))
+
+	## The ground storey's walls, out to the plinth's water-table (and the
+	## foundation under it on falling ground, PLINTH_EXTRA proud like the
+	## plinth), stone quoins at the corners, and what HouseBuilder stands on the
+	## ground beside them: the chimney stack, a porch, a veranda, an engawa and
+	## its steps, a deck on piles. Entry flights on falling ground are the
+	## village's to place (`ground_fit.entry_flights`), not listed here.
+	## Pueblo ladders and Sahel entry pilasters are not listed (thin, or at the
+	## door itself).
+	func ground_outline(building) -> Array[PackedVector2Array]:
+		var plan: HousePlan = building.plan
+		var spec: HouseSpec = plan.spec
+		var walls: Rect2 = HouseGeometry.site_rect(spec, 0)
+		var out: Array[PackedVector2Array] = [Poly.from_rect(walls.grow(
+			HouseGeometry.PLINTH_EXTRA + PLINTH_WATER_TABLE))]
+		if HouseGeometry.has_quoins(spec):
+			var q := Vector2.ONE * HouseGeometry.QUOIN_OUT
+			for c in [walls.position, Vector2(walls.end.x, walls.position.y), walls.end,
+					Vector2(walls.position.x, walls.end.y)]:
+				out.append(Poly.from_rect(Rect2(c - q, q * 2.0)))
+		var extras: Array[Rect2] = [HouseGeometry.chimney_rect(plan), HouseGeometry.porch_rect(plan),
+			HouseGeometry.veranda_rect(plan), HouseMinka.engawa_rect(plan), HouseMinka.steps_rect(plan)]
+		if HousePiles.on_piles(spec):
+			extras.append(HousePiles.platform_rect(plan))
+		for r in extras:
+			if r.has_area():
+				out.append(Poly.from_rect(r))
+		return out
 
 	## `HousePlan.entrance()`'s own door position: the plan says where the
 	## front door is, and the builder cuts it there.

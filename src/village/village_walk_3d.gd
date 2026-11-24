@@ -11,7 +11,9 @@ extends RefCounted
 ## and access flights), each house's entry flights (landing and treads, from
 ## HouseSlope via the lot's `entry_flights`) and every crossing's deck and
 ## ramps; obstructed by the same outlines the flat walk uses
-## (`VillageNavCheck.sources`) and by the footprints of the terrace, retaining
+## (`VillageNavCheck.sources`) except that a building is what it stands on the
+## ground (`built_outlines`: walls, plinth, foundation, chimney stack, porch;
+## BG-015-STREET-PLINTH), and by the footprints of the terrace, retaining
 ## and cheek walls. A step over MAX_CLIMB is a wall to the baker; a stair's
 ## risers are under it, so a stair is walked, not linked.
 ##
@@ -78,12 +80,17 @@ static func bake(plan: VillagePlan, opts: Dictionary = {}) -> Dictionary:
 	var lo := INF
 	for v in faces:
 		lo = minf(lo, v.y)
-	var obstacles := obstacle_outlines(plan)
-	for poly in obstacles:
-		var v3 := PackedVector3Array()
-		for p in poly:
-			v3.append(Vector3(p.x, 0.0, p.y))
-		src.add_projected_obstruction(v3, lo - 10.0, 2000.0, false)
+	var built := built_outlines(plan, opts)
+	var obstacles := obstacle_outlines(plan, built)
+	# the corner pads are CARVED: cut after the baker's erosion, not grown by it
+	var pads := corner_pads(plan, built)
+	for carve in [false, true]:
+		for poly in (pads if carve else obstacles):
+			var v3 := PackedVector3Array()
+			for p in poly:
+				v3.append(Vector3(p.x, 0.0, p.y))
+			src.add_projected_obstruction(v3, lo - 10.0, 2000.0, carve)
+	obstacles.append_array(pads)
 	var nm := NavigationMesh.new()
 	nm.cell_size = CELL
 	nm.cell_height = CELL_HEIGHT
@@ -140,9 +147,13 @@ static func bake(plan: VillagePlan, opts: Dictionary = {}) -> Dictionary:
 	var inserted := refine_edges(out, index, faces)
 	out = canonical(out["vertices"], out["polygons"])
 	out["links"] = entry_links(plan, out)
-	var stitched := stitch_links(out, obstacles)
+	var stitched := stitch_links(out, obstacles, built)
 	(out["links"] as Array).append_array(stitched)
+	var measured := 0
+	for row in built:
+		measured += 1 if bool(row["built"]) else 0
 	out["stats"] = {"faces": faces.size() / 3, "obstacles": obstacles.size(),
+		"built_outlines": measured,
 		"snap_worst_m": snappedf(moved, PLACES), "snapped_beside": beside, "pitched": pitched,
 		"overlaps_removed": removed, "overfull_edges": overfull_edges(out), "triangles": triangles,
 		"edge_vertices_added": inserted, "gap_links": stitched.size(),
@@ -237,8 +248,15 @@ const GAP_RISE := 0.3
 const GAP_SAMPLE := 0.25
 
 
-static func stitch_links(mesh: Dictionary, obstacles: Array[PackedVector2Array]) -> Array:
+## `buildings` (built_outlines) keeps a link the baked floor's own distance
+## off what each building stands on the ground, as well as out of the
+## obstacles: a gap link is walked as a straight line, and the two that ran
+## across a plinth and a foundation's corner (BG-015) did not cross the
+## obstacle they were tested against, which was the clear floor inside the
+## walls.
+static func stitch_links(mesh: Dictionary, obstacles: Array[PackedVector2Array], buildings: Array = []) -> Array:
 	var out: Array = []
+	var near := _outline_index(buildings)
 	var verts: PackedVector3Array = mesh["vertices"]
 	var polygons: Array = mesh["polygons"]
 	# the boundary samples of every polygon edge nothing else shares
@@ -287,7 +305,7 @@ static func stitch_links(mesh: Dictionary, obstacles: Array[PackedVector2Array])
 						var d := Vector2(p.x, p.z).distance_to(Vector2(q.x, q.z))
 						if d > GAP_REACH or d >= float(best_d.get(mine, INF)):
 							continue
-						if _walled(p, q, obstacles):
+						if _walled(p, q, obstacles) or _too_near(p, q, near):
 							continue
 						best_d[mine] = d
 						best[mine] = {"a": p, "b": q, "ia": mine, "ib": isl[int(o["poly"])]}
@@ -321,6 +339,59 @@ static func _walled(p: Vector3, q: Vector3, obstacles: Array[PackedVector2Array]
 			if Geometry2D.is_point_in_polygon(at, poly):
 				return true
 	return false
+
+
+## How near the walk may come to what a building stands on the ground: the
+## agent's radius less half a baker's cell's diagonal (0.073 m). Recast
+## decides a cell by its centre, which is within half a diagonal of any point
+## of it, so that is what its raster can give away of the radius it eroded
+## by (BUILT_GROW and the corner pads hold the floor to it). A gap link is
+## exact, but its two ends are on the floor's edge, so it is held to the same
+## figure: a stricter one would refuse a link that leaves a landing straight
+## away from the wall.
+static func gap_clear() -> float:
+	return agent_radius() - CELL * 0.5 * sqrt(2.0)
+
+
+## The building outlines with their plan boxes, for _too_near.
+static func _outline_index(buildings: Array) -> Array:
+	var out: Array = []
+	for row in buildings:
+		if not bool(row["built"]):
+			continue
+		for poly in row["polys"]:
+			out.append({"poly": poly, "box": Poly.bounding_rect(poly).grow(gap_clear())})
+	return out
+
+
+## Whether the plan line p-q passes within gap_clear() of an outline (or
+## through it).
+static func _too_near(p: Vector3, q: Vector3, index: Array) -> bool:
+	var a := Vector2(p.x, p.z)
+	var b := Vector2(q.x, q.z)
+	var span := Rect2(a, Vector2.ZERO).expand(b)
+	for row in index:
+		if not (row["box"] as Rect2).intersects(span, true):
+			continue
+		if segment_to_poly(a, b, row["poly"]) < gap_clear():
+			return true
+	return false
+
+
+## Least plan distance from the segment a-b to the polygon; 0 when it
+## crosses or lies inside.
+static func segment_to_poly(a: Vector2, b: Vector2, poly: PackedVector2Array) -> float:
+	if poly.size() >= 3 and (Geometry2D.is_point_in_polygon(a, poly) or Geometry2D.is_point_in_polygon(b, poly)):
+		return 0.0
+	var best := INF
+	for k in poly.size():
+		var c: Vector2 = poly[k]
+		var d: Vector2 = poly[(k + 1) % poly.size()]
+		if Geometry2D.segment_intersects_segment(a, b, c, d) != null:
+			return 0.0
+		var pair := Geometry2D.get_closest_points_between_segments(a, b, c, d)
+		best = minf(best, (pair[0] as Vector2).distance_to(pair[1]))
+	return best
 
 
 ## The pitch of a lot's access flight, from the ground before its first
@@ -701,17 +772,127 @@ static func _flight_rows(plan: VillagePlan) -> Array:
 	return out
 
 
+## A building's built outline is grown by half a baker's cell before the baker
+## grows it by the agent's radius: Recast stops a cell when its CENTRE is
+## inside an obstruction, so an edge may fall half a cell inside the cells it
+## stops. Along a wall the floor then stands about 0.375 m off it.
+##
+## A convex CORNER needs more. Recast erodes the floor by the radius only
+## across a cell's EDGES (a cell that touches a stopped one at a corner stays
+## floor) and simplifies the outline by EDGE_ERROR after: the floor came to
+## 0.00-0.08 m of a bare obstruction's corner in a probe
+## (scratch/bg015_recast_probe.gd), and 0.064 m from a chimney stack's corner
+## on Manarola with half a cell grown. So each convex corner also gets a
+## carved PAD (corner_pads), which takes the cells off its diagonal and
+## nothing along its faces: with them the six terrain-lane fixtures came no
+## nearer than 0.117 m. Growing a whole cell all round instead (0.19 m) shut
+## the 1.25 m strip between a shop's front and its lot's edge on vstepswalk's
+## Manarola, stranding a door the half cell keeps.
+const BUILT_GROW := CELL * 0.5
+
+
+## The carved squares at each convex corner of what every building stands on
+## the ground, aligned to the baker's grid (plan axes), half a side the
+## agent's radius: cut after the baker's erosion, not grown by it. None by an
+## entry flight's landing: a porch deck that is a landing is stepped off at
+## its corners too.
+static func corner_pads(plan: VillagePlan, built: Array) -> Array[PackedVector2Array]:
+	var out: Array[PackedVector2Array] = []
+	var half := Vector2.ONE * agent_radius()
+	for i in plan.buildings.size():
+		if not bool(built[i]["built"]):
+			continue
+		var landings: Array[PackedVector2Array] = []
+		for f in plan.lots[int(plan.buildings[i]["lot"])]["ground_fit"].get("entry_flights", []):
+			landings.append(f["treads"][0]["poly"])
+		for poly in built[i]["polys"]:
+			var n: int = (poly as PackedVector2Array).size()
+			var ccw: bool = Poly.signed_area(poly) > 0.0
+			for k in n:
+				var at: Vector2 = poly[k]
+				var turn: float = (at - poly[(k + n - 1) % n]).cross(poly[(k + 1) % n] - at)
+				if absf(turn) < 1e-9 or (turn > 0.0) != ccw:
+					continue
+				var by_landing := false
+				for l in landings:
+					if VillageMeasure.point_to_poly(at, l) <= agent_radius() + BUILT_GROW:
+						by_landing = true
+						break
+				if not by_landing:
+					out.append(Poly.from_rect(Rect2(at - half, half * 2.0)))
+	return out
+
+
+## What each building stands on the ground, in the plan's frame, by building
+## index (BG-015-STREET-PLINTH): {"polys": Array[PackedVector2Array], "built":
+## bool}. Its lot's `ground_fit.built_outline` (BuildingFamilyAdapter
+## .ground_outline: walls, plinth and foundation, quoins, chimney stack,
+## porch, veranda; "built" true), else its `footprint` ("built" false).
+## `opts.footprints` gives the footprint for every building -- the walk as it
+## was baked before, for a check's failing control.
+static func built_outlines(plan: VillagePlan, opts: Dictionary = {}) -> Array:
+	var out: Array = []
+	for i in plan.buildings.size():
+		var b: Dictionary = plan.buildings[i]
+		var polys: Array[PackedVector2Array] = []
+		var built := not bool(opts.get("footprints", false)) and _has_built_outline(plan, i)
+		if built:
+			polys.assign(plan.lots[int(b["lot"])]["ground_fit"]["built_outline"])
+		else:
+			polys.append(VillageMeasure.footprint_poly(b))
+		out.append({"polys": polys, "built": built})
+	return out
+
+
+## Each polygon grown by `by` (mitred), its outer outline only.
+static func _grown(polys: Array, by: float) -> Array[PackedVector2Array]:
+	var out: Array[PackedVector2Array] = []
+	for poly in polys:
+		for g in Geometry2D.offset_polygon(poly, by, Geometry2D.JOIN_MITER):
+			if not Geometry2D.is_polygon_clockwise(g):
+				out.append(g)
+	return out
+
+
+static func _has_built_outline(plan: VillagePlan, i: int) -> bool:
+	var li: int = int(plan.buildings[i].get("lot", -1))
+	return li >= 0 and li < plan.lots.size() \
+		and not (plan.lots[li].get("ground_fit", {}).get("built_outline", []) as Array).is_empty()
+
+
 ## What stands in the walk in 3D: the flat walk's obstacles, except that a
-## building is its WALLS (VillageMeasure.footprint_poly, less a manor's arrival
-## court), not its eaves -- an eave is over head, and over a house's entry
-## landing -- and the footprints of the terrace, retaining and cheek walls.
-static func obstacle_outlines(plan: VillagePlan) -> Array[PackedVector2Array]:
+## building is what it stands on the ground (`built`, from built_outlines:
+## its walls, plinth, foundation, chimney stack, porch...), grown by
+## BUILT_GROW except by its entry flights' landings, less a manor's arrival
+## court and less the landings -- not its eaves: an eave is over head, and
+## over a house's entry landing -- and the footprints of the terrace,
+## retaining and cheek walls. A landing is floor up to the wall it stands
+## against; the plinth's few centimetres beside the door are the door's
+## approach.
+static func obstacle_outlines(plan: VillagePlan, built: Array = []) -> Array[PackedVector2Array]:
+	if built.is_empty():
+		built = built_outlines(plan)
 	var out: Array[PackedVector2Array] = []
 	for row in VillageNavCheck.sources(plan)["obstacles"]:
 		if row["kind"] != "building":
 			out.append(row["poly"])
-	for b in plan.buildings:
-		var walls: Array[PackedVector2Array] = [VillageMeasure.footprint_poly(b)]
+	for i in plan.buildings.size():
+		var b: Dictionary = plan.buildings[i]
+		var walls: Array[PackedVector2Array] = []
+		if bool(built[i]["built"]):
+			var landings: Array[PackedVector2Array] = []
+			for f in plan.lots[int(b["lot"])]["ground_fit"].get("entry_flights", []):
+				landings.append(f["treads"][0]["poly"])
+			# grown, except within BUILT_GROW of a landing: there the outline
+			# as built, less the landing. A porch deck that IS the landing,
+			# a riser off the ground, is stepped off on every side; grown,
+			# the porch round it walled it in (an island; lane Manarola b-005)
+			walls = _grown(built[i]["polys"], BUILT_GROW)
+			if not landings.is_empty():
+				walls = VillageNavCheck._minus(walls, _grown(landings, BUILT_GROW))
+				walls.append_array(VillageNavCheck._minus(built[i]["polys"], landings))
+		else:
+			walls.assign(built[i]["polys"])
 		if b["placement"].has("approach"):
 			var court := PackedVector2Array()
 			var xf: Transform3D = b["transform"]
@@ -1062,7 +1243,7 @@ static func islands(mesh: Dictionary) -> PackedInt32Array:
 
 ## The polygon under `p` whose surface is nearest its height, and the point on
 ## it: {"polygon", "point"}; else the nearest point on any edge, by 3D
-## distance. {"polygon": -1} on an empty mesh.
+## distance, moved INTO its polygon. {"polygon": -1} on an empty mesh.
 static func closest(mesh: Dictionary, p: Vector3) -> Dictionary:
 	var verts: PackedVector3Array = mesh["vertices"]
 	var polygons: Array = mesh["polygons"]
@@ -1082,6 +1263,7 @@ static func closest(mesh: Dictionary, p: Vector3) -> Dictionary:
 	# in 3D -- a landing's edge, not the lot a storey below it
 	if best >= 0 and best_d <= 0.3:
 		return {"polygon": best, "point": best_pt}
+	var on_edge := false
 	for i in polygons.size():
 		var poly: PackedInt32Array = polygons[i]
 		for k in poly.size():
@@ -1092,4 +1274,33 @@ static func closest(mesh: Dictionary, p: Vector3) -> Dictionary:
 				best_d = c.distance_to(p)
 				best = i
 				best_pt = c
+				on_edge = true
+	if on_edge:
+		best_pt = _into(verts, polygons[best], best_pt)
 	return {"polygon": best, "point": best_pt}
+
+
+## How far a point found on a polygon's edge is moved into it, so that a
+## door's or a gate's 3D point (written to the millimetre) is ON the mesh and
+## not a hair past a corner of it (BG-015: a door's threshold beyond a plinth
+## now lies off the mesh more often, and its nearest point is an edge's).
+const INTO := 0.02
+
+
+## `p`, on the edge of convex polygon `poly`, moved INTO metres toward its
+## middle in plan (at most half way), at the polygon's height there.
+static func _into(verts: PackedVector3Array, poly: PackedInt32Array, p: Vector3) -> Vector3:
+	var mid := Vector2.ZERO
+	for k in poly:
+		mid += Vector2(verts[k].x, verts[k].z)
+	mid /= float(poly.size())
+	var q := Vector2(p.x, p.z)
+	var d := mid - q
+	if d.length() < 1e-6:
+		return p
+	q += d.normalized() * minf(INTO, d.length() * 0.5)
+	for k in range(1, poly.size() - 1):
+		var h := _height_near(verts[poly[0]], verts[poly[k]], verts[poly[k + 1]], q)
+		if not is_nan(h):
+			return Vector3(q.x, h, q.y)
+	return p

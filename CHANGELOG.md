@@ -6,6 +6,128 @@ projects consume that, never this working tree (`docs/RELEASES.md`).
 `BrickWild.API_VERSION` is a separate compatibility number; see `README.md`
 and `docs/PUBLIC_API_TRANSPORT.md`.
 
+## 0.1.9 - 2026-11-23
+
+A consumer's city always comes out whole, and brings its ground with it.
+Asked by VoxelGames (its BG-015 to BG-018), after BG-017 and BG-018 had been
+answered with a better lot search, which was not the problem
+(`docs/VILLAGE_TERRAIN.md` "The caller shapes the ground", task
+CITY-GROUND-CONTRACT). Tag `v0.1.9`. `API_VERSION` stays 2. A FLAT export
+without the new flags is byte-identical to b7415a1's (checked on Thaanafu's
+flat plan). On ground without them the lots and buildings are the same; the
+plan's `walk.navmesh_3d` moves off the walls (BG-015) and a house on a fall
+moves its path stones (BG-016). Against 0.1.8 a hamlet is byte-identical and
+a town shown small is re-planned (b7415a1; see the compatibility notes).
+
+### Notable changes
+
+- **`--ground-policy shape` on the exporter.** For a caller that cuts and
+  fills its own terrain. The request is planned on the ground as given; when a
+  building is left out it is planned again on the same land keeping less of
+  its relief (`VillageGroundEasing`: 1, 0.5, 0.25, 0.1, 0, or `--keep-relief`),
+  the shoreline and the grid's border untouched, until every building stands.
+  Only a programme that does not fit level ground is still refused, and its
+  `refused` block carries `ground_tried`.
+- **The plan brings the ground it was built on** (`earthworks`).
+  `earthworks.finished` names a 1 m `brickwild.terrain` grid of the site in the
+  plan's frame, written beside the plan (`--ground-out`): every lot on its
+  platform and GroundFall's plane, every road bed and stair cut, with a 12 m
+  margin of the given ground to blend over (`VillageFinishedGround`).
+  `earthworks.eased.lift` names the metres to add to the given ground where
+  the land was eased (`--lift-out`). A consumer lays both and cuts no pad of
+  its own; its terrain is then the ground the entry flights, plinths, props
+  and `walk.navmesh_3d` were planned on.
+- **`--measure-cache DIR`** (BG-018-MEASURE-CACHE). The programme's flat
+  placements, and a church's, temple's or castle's measurement on each fall,
+  kept between runs (`VillageMeasureCache`, shared with
+  `tools/probe_site_refusal.gd --cache`). The easing ladder reuses them from
+  rung to rung within a run whether or not a directory is given.
+- **The 3D street keeps off what a house builds at the ground**
+  (BG-015-STREET-PLINTH). `walk.navmesh_3d` was cut off each building's
+  `footprint`, which for houses, shops and hotels is the clear floor INSIDE the
+  walls, so the mesh edge stood about 0.1 m inside every wall face and paths
+  ran into plinths and foundations. It is now cut off the built outline
+  (`BuildingFamilyAdapter.ground_outline`, kept as `ground_fit.built_outline`:
+  walls, plinth, foundation, quoins, chimney stack, porch, veranda), grown by
+  half a baker's cell with carved pads at convex corners, and a `gap` link is
+  refused within 0.073 m of one. New rule `qa/village_walk_clearance.gd` in
+  `lane:village-terrain`, with the old bake as its failing control. `poly_m`
+  is unchanged and is still the clear floor (BG-015-POLY-M, owner's decision);
+  churches, temples, castles and windmills still use the footprint
+  (BG-015-OTHER-FAMILIES).
+- **A house's path stones lie on its ground** (BG-016-PATH-STONES). On falling
+  ground the front-path pavers stood at the floor's height, in the air over
+  the entry flight. They now sit on GroundFall's plane and give way to the
+  flight's landing and treads. Flat houses are vertex-identical.
+- **The town shown small, and the great buildings with no lot** (BG-017,
+  BG-018; commit b7415a1). A town shown at 30 to 60 people with a civic
+  programme for 500 sizes its square for the civic programme; the site grows
+  across the road when only deep buildings are left; a planted town's seat
+  takes a lane off the outer street; a temple's level pad scales with its
+  footprint; a refusal names the rule that left each building out
+  (`refused.unplaced_why`); the search budget is 60 re-plans, not wall seconds.
+
+### Measured
+
+VoxelGames' three cities on their own 5 m grids, `--ground-policy shape`
+(`docs/VILLAGE_TERRAIN.md` has the table): Yapoommooloo 29/29 and Wuunafu
+28/28 on the ground as given; Thaanafu 19/22 as given, 22/22 once the land
+keeps half its relief (cut to 16.1 m, fill to 10.0 m). 0.1.8 refused all
+three on their ground. A re-bake with the measurements kept: 923 s, 699 s and
+2335 s, three side by side.
+
+In VoxelGames (Yapoommooloo, 14,279 vertices of the 3D walk against the meshed
+terrain): the terrain is off the walk by a median of 0.00 m and 0.38 m at the
+95th percentile with the finished ground laid, against 0.29 m and 1.88 m with
+one level pad per building. Its door probe on Wuunafu: 17 paths walk into a
+wall with the new street mesh, 27 with the old; 7 of the 17 are the floating
+path stones of the 0.1.8 addon it was run against.
+
+Known: the new street mesh no longer reaches a door that was only reached
+through a wall's foot (`reachable_3d` false: Wuunafu b-022; BG-015-ACCESS-CLEAR).
+`lane:village-terrain` has two failures, both on Manarola's crossroads (no
+stair street with treads; the access-flight control strands no door). They are
+not new: the frozen 0.1.8 release fails the same two on the same plan (499
+checks there, 502 here with the clearance rule; VTER-LANE-MANAROLA-RED).
+`vstepswalk` is red as it was on 0.1.8: 184 checks, 10 failures there and 11
+here, nine of them the same. Hallstatt's door b-005 is back on the gates'
+island. Manarola green's shop b-001 is off it (two failures; it was reached
+through its wall's foot, BG-015-ACCESS-CLEAR), and Manarola's path stands
+0.183 m off the mesh where it stood 0.111 m.
+
+The release gate, 23 Nov, green: `lane:city-ground` (56 checks), `hslope`
+(336), `lane:house-exterior-fast`, `lane:village-fast`, `libraryquick` (104),
+`vterrain` (178), `vgroundterrain` (27), `vworld` (522), the addon smoke and
+its three new checks run against the repository (the freeze runs it in the
+installed addon), and a cold import of the release tree with no script
+error. Not run for this release: `lane:scheduled`, `village`, `vlot`,
+`vreal`, `dmvbrief`, `library`, `placement`.
+
+### For consumers
+
+- VoxelGames: pin 0.1.9, bake with `--terrain` and `--ground-policy shape`,
+  lay `earthworks.finished` (and `eased.lift`) into the terrain. `--accept-partial`
+  is no longer needed for its three cities.
+- A consumer that does not shape its ground changes nothing, unless it plans a
+  town shown small (below): that town keeps its buildings and is laid out
+  anew. Re-bake it.
+
+### Compatibility and migration notes
+
+- **Against 0.1.8, flat, no new flags** (the same requests through
+  `releases/brick_wild-0.1.8/project` and this tree, 23 Nov). `thorn-hamlet`
+  is byte-identical (sha256 e472e5b3...). A town shown small is not:
+  `wuunafu-schema2` at 60 shown and 6000 implied, and `thaannafu-schema2` at
+  45 and 4000, keep every building request (29 and 21, all placed) and are
+  laid out anew by BG-017 and BG-018. 11 roads become 9, and Thaannafu's site
+  goes from 400.0 x 235.3 m to 278.7 x 222.3 m. A plan kept from 0.1.8 for
+  such a town does not match this release's.
+
+- New `class_name`s: `VillageGroundEasing`, `VillageFinishedGround`,
+  `VillageMeasureCache`. No collision known.
+- `tools/probe_site_refusal.gd` reads and writes the same cache files as
+  before; its private cache helpers moved to `VillageMeasureCache`.
+
 ## 0.1.8 - 2026-11-16
 
 The site exporter takes a place. VoxelGames plans its cities through

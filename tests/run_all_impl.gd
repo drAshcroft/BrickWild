@@ -64,7 +64,7 @@ const ORDER: Array[String] = ["libraryquick", "placementquick", "poly", "props",
 	"tree", "bridge", "windmill", "dungeon"]
 
 ## Explicit lanes which should not be repeated by the default all-suite run.
-const EXTRA: Array[String] = ["hslope", "hpiles", "hhousehold", "vwaterform", "library", "placement", "cultureapi", "compactapi", "vworld", "vrealism", "vterrain", "vterrainlane", "vcharacter", "vreal", "vshape", "vanalysis", "vground", "vgroundterrain", "vstepswalk", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
+const EXTRA: Array[String] = ["hslope", "hpiles", "hhousehold", "vwaterform", "library", "placement", "cultureapi", "compactapi", "vworld", "vrealism", "vterrain", "vterrainlane", "vgroundshape", "vcharacter", "vreal", "vshape", "vanalysis", "vground", "vgroundterrain", "vstepswalk", "vdecoration", "vdecorationapi", "vappearance", "vmine", "varchetypecontracts", "vnativeqa", "vwater", "vmill", "vmillfull", "vformslayout", "vformsfull", "vquick", "vcompact",
 	"vvernacular", "vvernacularbuild", "vplace", "vplacebuild",
 	"vformsfull_crossroads", "vformsfull_round", "vformsfull_strand", "vformsfull_planted", "vformsfull_gate",
 	"crooked", "temple_basilica", "temple_pylon", "temple_ziggurat", "temple_rotunda", "temple_extras",
@@ -157,6 +157,12 @@ const LANES: Dictionary = {
 	# control per rule. Under the five-minute host cap; the fuller suites stay
 	# vtplan, vstepswalk, vterrain and vanalysis.
 	"lane:village-terrain": ["vterrainlane"],
+	# CITY-GROUND-CONTRACT: a caller that shapes its own ground (the exporter's
+	# --ground-policy shape). Easing, the ladder, a hamlet a wall of ground
+	# refuses standing whole on eased ground, the finished ground and the
+	# earthworks read back. Run after any change to the exporter's planning,
+	# VillageGroundEasing, VillageFinishedGround or VillageGroundSurface.
+	"lane:city-ground": ["vgroundshape"],
 	"lane:village-appearance-fast": ["vdecoration", "vdecorationapi", "vappearance"],
 	# VILLAGE-VERNACULAR (docs/VILLAGE_VERNACULAR.md): the regional dataset, the
 	# blend and its check, then every house type and shop built and checked
@@ -515,6 +521,8 @@ static func _run_one(key: String) -> SuiteResult:
 			return preload("res://tests/suites/village_real_suite.gd").run()
 		"vterrainlane":
 			return preload("res://tests/suites/village_terrain_lane_suite.gd").run()
+		"vgroundshape":
+			return preload("res://tests/suites/village_ground_shape_suite.gd").run()
 		"vanalysis":
 			return preload("res://tests/suites/village_site_analysis_suite.gd").run()
 		"vtplan":

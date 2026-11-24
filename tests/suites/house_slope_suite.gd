@@ -32,6 +32,7 @@ static func run() -> SuiteResult:
 	for kind in [&"house", &"shop", &"church"]:
 		_family(res, kind)
 	_walk_finite(res)
+	_path_stones(res)
 	return res
 
 
@@ -129,6 +130,19 @@ static func _family(res: SuiteResult, kind: StringName) -> void:
 			res.note("%s: %d ms" % [label, Time.get_ticks_msec() - t0])
 
 
+## Path stones in a built house's yard (none for a church).
+static func _paver_count(building: GeneratedBuilding) -> int:
+	var n := 0
+	var plan: Variant = building.get("plan")
+	if plan == null:
+		return 0
+	for piece in plan.yard_pieces:
+		for part in piece["parts"]:
+			if str(part["role"]) == "path_paver":
+				n += 1
+	return n
+
+
 static func _build(req: BuildingRequest) -> Dictionary:
 	var made := BrickWild.generate(req)
 	if not made.is_ok():
@@ -174,6 +188,9 @@ static func _case(res: SuiteResult, label: String, kind: StringName,
 			var want := ComponentCheck._triangle_vertices(flat["mesh"].surface_get_arrays(s))
 			var have := ComponentCheck._triangle_vertices(mesh.surface_get_arrays(s))
 			missing += ComponentCheck.missing_triangles(have, want)
+		# BG-016: the front-path stones are re-seated on the falling ground, so the
+		# flat house's own stones (12 triangles each) are the one thing allowed to move
+		missing = maxi(0, missing - 12 * _paver_count(flat["building"]))
 		if missing > 0:
 			res.fail("%s: %d triangles of the flat building are gone" % [label, missing])
 
@@ -383,6 +400,61 @@ static func _walk_finite(res: SuiteResult) -> void:
 	if not BuildingNavigation.is_finite_value(swept) or not swept.has("omitted") 			or swept["doors"].size() != good["doors"].size() - 1:
 		res.fail("control: an injected inf door was not dropped and reported")
 	res.note("BG-014: %d sloped townhouses publish finite walks; the control poisons a door and sees it omitted" % WALK_CASES.size())
+
+
+# ------------------------------------------------- BG-016-PATH-STONES
+
+## On falling ground the front-path stones lie on the ground they cross and leave
+## the entry flight alone; on flat ground they are where they always were.
+static func _path_stones(res: SuiteResult) -> void:
+	var stones := 0
+	var deepest := 0.0
+	for key in WALK_CASES:
+		var c: Dictionary = WALK_CASES[key]
+		var req := BuildingRequest.from_dict({"schema": "brickwild.request", "schema_version": 1,
+			"kind": "house", "style": "townhouse", "material": "timber", "enclosure": "none",
+			"water": "none", "period": 1200, "orientation": 0.0, "height": 2.6, "storeys": 2,
+			"purpose": c["purpose"], "seed": str(c["seed"]), "width": c["width"], "length": c["length"],
+			"ground_fall_m": c["fall"], "ground_downhill_deg": c["downhill"]})
+		var plan: HousePlan = BrickWild.generate(req).plan
+		var g := HouseSlope.ground(plan.spec)
+		var rects: Array[Rect2] = []
+		for f in HouseSlope.flights(plan):
+			rects.append_array(GroundFall.flight_rects(f))
+		for piece in plan.yard_pieces:
+			for part in piece["parts"]:
+				if str(part["role"]) != "path_paver":
+					continue
+				stones += 1
+				var a := HouseYard.part_aabb(part)
+				var r := Rect2(Vector2(a.position.x, a.position.z), Vector2(a.size.x, a.size.z))
+				var lo := INF
+				for corner in GroundFall.corners(r):
+					lo = minf(lo, g.ground_y(corner))
+				res.checked += 1
+				deepest = minf(deepest, lo)
+				if a.position.y > lo + 0.05:
+					res.fail("%s: a path stone hangs %.2f m over its ground" % [key, a.position.y - lo])
+				for fr in rects:
+					res.checked += 1
+					if fr.intersects(r):
+						res.fail("%s: a path stone overlaps the entry flight" % key)
+	# the failing control: a stone laid at the flat height is caught by the same test
+	res.checked += 1
+	if not (0.0 > deepest + 0.05):
+		res.fail("control: the hang test cannot tell a floor-height stone from a grounded one")
+	# flat ground: three stones at y 0..0.045, exactly as before
+	var flat := BrickWild.generate(_request(&"house")).plan
+	var flat_n := 0
+	for piece in flat.yard_pieces:
+		for part in piece["parts"]:
+			if str(part["role"]) == "path_paver":
+				flat_n += 1
+				res.checked += 1
+				var fa := HouseYard.part_aabb(part)
+				if absf(fa.position.y) > 1e-6 or absf(fa.size.y - 0.045) > 1e-6:
+					res.fail("flat: a path stone moved off y 0..0.045")
+	res.note("BG-016: %d path stones on %d sloped townhouses sit on the ground; %d flat stones unmoved" % [stones, WALK_CASES.size(), flat_n])
 
 
 # ------------------------------------------------------------------ helpers

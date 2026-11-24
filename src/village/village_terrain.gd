@@ -181,6 +181,23 @@ static func from_dict(d: Dictionary, base_dir := "") -> VillageTerrain:
 	return t
 
 
+## A grid on this one's lattice carrying other heights: the eased ground and
+## the lift between two grounds (VillageGroundEasing). The water level and the
+## character carry over; `p_source` says what the heights are.
+func with_heights(p_heights: PackedFloat32Array, p_source: String) -> VillageTerrain:
+	var t := VillageTerrain.new()
+	t.origin = origin
+	t.cell_m = cell_m
+	t.cols = cols
+	t.rows = rows
+	t.heights = p_heights
+	t.water_level_m = water_level_m
+	t.character = character.duplicate(true)
+	t.source = p_source
+	t._validate()
+	return t
+
+
 ## A `brickwild.terrain` JSON file; a relative `file` inside it is read from
 ## the JSON's own directory.
 static func from_file(path: String) -> VillageTerrain:

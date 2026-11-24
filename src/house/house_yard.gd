@@ -822,6 +822,11 @@ static func _path(ctx: Dictionary) -> Dictionary:
 	var parts: Array = []
 	var d := 0.28
 	var porch := HouseGeometry.porch_rect(ctx["plan"])
+	var g := HouseSlope.ground((ctx["plan"] as HousePlan).spec)
+	var flights: Array[Rect2] = []
+	if g != null:
+		for f in HouseSlope.flights(ctx["plan"]):
+			flights.append_array(GroundFall.flight_rects(f))
 	# Full walking-width pavers read as an approach, not a tiny scattering of
 	# stones. Built geometry also survives a public checkout without Wild art.
 	while d < float(cell["room"]) - 0.24:
@@ -834,9 +839,38 @@ static func _path(ctx: Dictionary) -> Dictionary:
 		var on_porch: bool = porch.size.x > 0.0 and porch.grow(0.05).intersects(r)
 		if not on_porch and clear_reason(ctx["plan"], env, b).is_empty() \
 				and _overlap_reason(ctx["accepted"], b).is_empty():
+			if g != null:
+				# BG-016-PATH-STONES: on falling ground a stone lies on the ground it
+				# crosses, and gives way to the entry flights (landing and treads).
+				if _on_flight(r, flights):
+					d += 0.50
+					continue
+				part = _part_on_ground(cell, d, g, r, part)
 			parts.append(part)
 		d += 0.50
 	return {"pieces": [_piece("path", "approach", parts, "path")]} if not parts.is_empty() else {}
+
+
+## True when a plan rectangle overlaps any rectangle of an entry flight.
+static func _on_flight(r: Rect2, flight_rects: Array[Rect2]) -> bool:
+	for fr in flight_rects:
+		if fr.intersects(r):
+			return true
+	return false
+
+
+## A paver re-seated on falling ground: its underside at the lowest ground under
+## its corners, tall enough to reach the highest, so no edge hangs in the air.
+static func _part_on_ground(cell: Dictionary, d: float, g: GroundFall, r: Rect2,
+		flat: Dictionary) -> Dictionary:
+	var lo := INF
+	var hi := -INF
+	for c in GroundFall.corners(r):
+		var y := g.ground_y(c)
+		lo = minf(lo, y)
+		hi = maxf(hi, y)
+	var h: float = float((flat["size"] as Vector3).y) + (hi - lo)
+	return _part(cell, str(flat["role"]), 0.0, d, 0.86, 0.46, lo, h, str(flat["surf"]))
 
 
 static func _flowers(ctx: Dictionary) -> Dictionary:

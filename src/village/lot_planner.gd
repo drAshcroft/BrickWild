@@ -2873,6 +2873,9 @@ static func _commit(plan: VillagePlan, lot: Dictionary, job: Dictionary, _rule: 
 		# whose flights are planned rather than measured off a mesh
 		ground_record["entry_flights"] = VillageAccessSteps.entry_flights(
 			fit["parts"].get("flight_rows", []), xf, float(ground_record["platform_m"]))
+		# what the building stands on the platform, for the 3D walk to keep
+		# off (BG-015-STREET-PLINTH)
+		ground_record["built_outline"] = VillageLotGround.built_outline(job, xf)
 		record["ground_fit"] = ground_record
 		request = VillageLotGround.request_for(request, fit["reading"])
 	if lot.has("piles"):

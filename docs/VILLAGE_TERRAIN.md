@@ -164,6 +164,13 @@ falls 44 m over 226 m at a steepest grade of 48 %.
 
 ## For VoxelGames
 
+**Superseded 2026-11-23 by "The caller shapes the ground", below.** Points 2
+and 3 here told the consumer to rebuild the ground from readings (a pad per
+building, roads graded by profile). That is what put VoxelGames' terrain out
+of step with the plan's own flights, plinths and street mesh. A consumer that
+shapes its ground passes `--ground-policy shape` and lays the `finished`
+grid the plan brings. Point 1 stands. The rest is kept as the record.
+
 What changes now, without waiting for terrain-aware planning:
 
 1. **Bake the ground with the plan.** Where `bake_city_sites` asks for a
@@ -1847,10 +1854,24 @@ BUILT, not from the plan:
   among them), each house's entry LANDING (`entry_flights`), each crossing's
   deck and ramps, and the props' aprons;
 * **obstructions** (projected, all heights): the flat walk's obstacles
-  (`VillageNavCheck.sources`) except that a building is its walls
-  (`footprint_poly`), not its eaves -- an eave is over head and over the
-  landing -- plus the footprints of every `terrace_wall`, `retaining_wall` and
-  `stair_cheek`, plus the treads of the entry flights;
+  (`VillageNavCheck.sources`) except that a building is what it stands on the
+  ground, not its eaves -- an eave is over head and over the landing -- plus
+  the footprints of every `terrace_wall`, `retaining_wall` and
+  `stair_cheek`, plus the treads of the entry flights. What a building stands
+  on (BG-015-STREET-PLINTH) is `lots[].ground_fit.built_outline`, written at
+  commit from `BuildingFamilyAdapter.ground_outline`: for a house or shop the
+  ground storey's walls out to the plinth's water-table (0.06 m proud; the
+  foundation under it on falling ground is 0.04), stone quoins, the chimney
+  stack, a porch, a veranda. It is grown by half a cell (`BUILT_GROW`) before
+  the baker's radius, and each convex corner gets a carved pad the radius
+  each way (`corner_pads`; Recast erodes only across cell edges, so a corner
+  turned off the grid otherwise lets the floor within 0.06 m), except by an
+  entry flight's landing (a porch deck that is a landing is stepped off on
+  every side). Until BG-015 it was
+  `footprint_poly`, which for the plan families is the CLEAR FLOOR inside the
+  walls (0.35 m short of a timber wall's face, 0.6 m of a stone one): the
+  mesh stood about 0.1 m inside every house's walls. A family with no outline
+  of its own (church, temple, castle, windmill) still uses `footprint`;
 * **agent**: radius 0.25 m, height 1.8 m, climb 0.24 m (12 cells of 2 cm),
   slope 46 degrees; cells 0.25 x 0.02 m; outlines simplified at most half a
   cell and 4 m long; a detail sample every 5 m within 4 cm.
@@ -1885,6 +1906,34 @@ through the treads' middles reaches it, to the upper level half a going past
 the top nosing. The link's straight line is then never more than half a riser
 off a tread. Stair streets (treads 0.45 m and longer, 2 m and more wide) are
 baked and walked.
+
+A `gap` link (an island a step under MAX_CLIMB from its neighbour) is refused
+if its straight line crosses an obstruction or passes within
+`VillageWalk3D.gap_clear()` (the radius less half a cell's diagonal, 0.073 m:
+what Recast's centre test can give away) of a building's built outline.
+
+**The clearance rule** (`qa/village_walk_clearance.gd`, in
+`lane:village-terrain`'s Manarola walk; BG-015): each house and shop is built
+as it stands on its lot (its measured plan with the request's fall, so the
+foundation is in it), every shell triangle under 1.8 m over its floor is
+taken, and no mesh edge or gap link may come within `gap_clear()` of one in
+plan, nor a mesh polygon stand inside its walls, outside the door's approach
+(the building's own entry flights, and a radius and a cell round them). It
+does not read the outline the walk was baked off. Control: the same village
+baked off `footprint` (`VillageWalk3D.bake(plan, {"footprints": true})`). On
+the six lane fixtures (2026-11-23) the walk came no nearer than 0.117-0.168 m;
+off `footprint`, 0.000 m, with 970-1353 half-metre pieces of edge too near.
+(Tried and dropped: half a cell and no pads, 0.064 m at a chimney's corner;
+a whole cell and no pads, 0.19 m, but it shut a strip in front of a shop.)
+
+Three doors the old walk reached are now `reachable_3d: false`, each reached
+before only through its own building's wall foot: plane_30 b-002 (its porch
+boxed in by its lot's access-flight cheek wall, a yard block and a quoin, 0.6
+m apart at most), `vstepswalk`'s Manarola green b-001 (a shop 0.63 m behind
+its lot's front retaining wall, its porch landing half over the verge 0.8 m
+above it: a 0.57 m slot between plinth and wall) and Masouleh street b-004
+(an access flight along the front; not inspected). They are planning faults
+(BG-015-ACCESS-CLEAR).
 
 **The export** (only with ground; every flat key unchanged):
 
@@ -2326,6 +2375,163 @@ Thaanñafu's ground takes the `hillside` form: its road and three terraces,
 depth steps cannot help at the 400 m cap. Next: an "outside" lane for every
 deep class off the outermost terrace, away from the common, as
 `_place_manor_outside` does for a planted seat.
+
+## The caller shapes the ground (CITY-GROUND-CONTRACT)
+
+Owner, 2026-11-23, from VoxelGames. BG-017 and BG-018 were answered by tuning
+the lot search. That was the wrong problem. A game does not want a refusal
+that explains itself well; it wants its city. What VoxelGames needs:
+
+1. **The whole programme, always.** The seat, the temples and the monuments
+   are what the world's history says the city IS; dungeons open at their
+   doors. A plan that leaves one out is not a smaller city, it is a wrong one.
+2. **Heights that agree in play.** The steps, plinths, props and street walk
+   BrickWild plans must stand on the terrain the game actually has.
+
+Both come down to who owns the ground inside a city. VoxelGames' terrain is
+voxels: it cuts and fills. So the ground it gives is where a plan starts, not
+a limit on it; and once the plan is made, the ground is whatever BrickWild
+built on. A consumer says so with `--ground-policy shape` (and `--terrain`).
+Without the flag nothing in this section runs and every plan is as before.
+
+| Piece | Where |
+|---|---|
+| the easing | `src/village/village_ground_easing.gd`, `VillageGroundEasing` |
+| the finished ground | `src/village/village_finished_ground.gd`, `VillageFinishedGround` |
+| kept measurements | `src/village/village_measure_cache.gd`, `VillageMeasureCache` (`--measure-cache DIR`) |
+| the exporter | `tools/export_village_plan.gd`: `plan_shaped`, `write_earthworks`, the plan's `earthworks` |
+| the suite | `vgroundshape`, `lane:city-ground` |
+
+### The whole programme stands
+
+The request is planned on the ground as given. If every building stands, that
+is the plan. If not, it is planned again on the same land keeping less of its
+relief, and again, until one ground holds them all:
+
+```
+keep_relief   1  ->  0.5  ->  0.25  ->  0.1  ->  0        (--keep-relief 1,0.5,0 for a caller's own)
+```
+
+`VillageGroundEasing.eased(given, keep)` scales the DRY relief about its mean:
+`eased = datum + keep * (given - datum)`. Every slope and every bump is `keep`
+of what it was; the hill is still the hill, and the form is derived from the
+eased ground like any other. Cut and fill balance about the datum. Two things
+never move: a node at or under the water (the easing fades in over the 3 m
+above it, so the shore stays where the caller put it), and the grid's border
+(the easing fades out over 80 m inside it, so the eased land meets the
+caller's own). `keep` 0 is level ground, where the flat planner's result
+holds; a programme that does not fit even that is still refused (exit 3), and
+its `refused` block carries `ground_tried`.
+
+This is a guarantee, not a layout rule, and it is deliberately blunt: it
+moves earth instead of teaching the lot search another special case. Every
+improvement to the search (BG-018-HILLSIDE-GREAT is the open one) makes a
+city stand at a higher `keep`, with nothing to change on the consumer's side.
+
+### The finished ground is written, not described
+
+BrickWild grades each lot to its platform and GroundFall's plane, beds each
+road, cuts each stair street (`VillageGroundSurface`), and plans the entry
+flights, plinths, props and `walk.navmesh_3d` against that ground. Until
+0.1.9 a consumer was told about it (`lots[].platform`, `buildings[].ground`)
+and left to rebuild it. VoxelGames levelled one pad per building instead, so
+flights ended in the air or in the bank, foundations showed, and the street
+mesh ran into them (its BG-015, BG-016 and the through-walls of
+CITY-WALLS-002 are all one disagreement about the ground).
+
+Now the plan carries the ground itself:
+
+```json
+"earthworks": {
+  "policy": "shape",
+  "keep_relief": 0.5,
+  "tried": [ {"keep_relief": 1.0, "form": "hillside", "requested": 22, "placed": 19, "re_plans": 40},
+             {"keep_relief": 0.5, "form": "gate", "requested": 22, "placed": 22, "re_plans": 12} ],
+  "given_fingerprint": "…",
+  "eased": {                       // null when the land was not eased
+    "datum_m": 20.865, "band_m": 80.0, "cut_max_m": 16.141, "fill_max_m": 9.952, "cut_m3": …, "fill_m3": …,
+    "lift": { "file": "site.lift.json", "frame": "the given grid's own", "unit": "metres added …", … }
+  },
+  "finished": {                    // null for a plan laid out flat (no VillageGroundSurface)
+    "file": "site.ground.json", "frame": "the plan's …", "origin_m": […], "cell_m": 1.0,
+    "cols": 307, "rows": 300, "margin_m": 12.0, "site_m": [x, y, w, h],
+    "cut_max_m": …, "fill_max_m": …, "fingerprint": "…"
+  },
+  "apply": "add eased.lift to your own ground …"
+}
+```
+
+* **`eased.lift`** (`--lift-out`, default `<out>.lift.json` + `.r32`): a
+  `brickwild.terrain` grid on the GIVEN grid's lattice whose values are metres
+  to ADD to the caller's ground, negative where it cuts, zero at the border.
+  Added to the caller's own surface (which has more detail than a 5 m grid) it
+  eases the land without smoothing it.
+* **`finished`** (`--ground-out`, default `<out>.ground.json` + `.r32`): a
+  `brickwild.terrain` grid at 1 m in the PLAN's frame (a node at plan point p
+  stands at `site.anchor_m + p rotated by site.yaw_deg`). Inside `site_m` it
+  is `VillageGroundSurface.height_at`: the built ground. In the 12 m margin
+  round it, the ground the plan was made on, for the consumer to blend back
+  over. A step in the ground (a terrace wall, a riser beside a road bed) is
+  sampled as it is, so a voxel terrain ramps within a cell where the mesh
+  drops a wall; `lots[].platform.terrace_walls` still says where the walls go.
+
+The consumer's rule is one line: `ground = (own ground + lift)`, replaced
+inside the site by `finished`, blended across the margin. It cuts no pad and
+grades no road of its own. VoxelGames does this in `CityGroundPatch`
+(`game/scripts/world/city_ground_patch.gd`), laid by `CityGrounds`.
+
+### Bounded time
+
+`--measure-cache DIR` keeps the flat placement of every building and a
+church's, temple's or castle's measurement on each fall (`VillageMeasureCache`,
+the probe's `--cache` moved into `src/`; one directory serves both). The
+ladder re-plans one programme, so within a run every rung reuses the last
+one's measurements whether or not a directory is given. Keep one directory per
+release (a release never changes); in a working tree delete it after changing
+a builder. The search itself is bounded as before (`--search-attempts`, 60
+re-plans a rung).
+
+### Measured (2026-11-23, VoxelGames' three cities, their 5 m grids)
+
+`export_village_plan.gd --terrain <grid> --ground-policy shape --measure-cache
+<dir>` with each city's vernacular, shown and implied people, the three side
+by side on one loaded machine, the cache warm for the ground as given:
+
+| city | shown | ground under the site | kept | placed | form | site | the land eased | the finished ground | time |
+|---|---|---|---|---|---|---|---|---|---|
+| Yapoommooloo | 60 | 14.7 m | 1 | 29/29, 30 re-plans | planted | 299 x 261 m | - | cut to 7.4 m, fill to 1.8 m; 48,500 of 78,200 m2 moved | 998 s |
+| Wuuñafu | 60 | 17.4 m | 1 | 28/28, 5 re-plans | planted | 371 x 275 m | - | cut to 3.7 m, fill to 1.5 m; 60,200 of 101,800 m2 | 1167 s |
+| Thaanñafu | 45 | 52 m after easing | 0.5 | 19/22 at 1 (hillside, 40 re-plans), then 22/22 (gate, 12 re-plans) | gate | 282 x 275 m | cut to 16.1 m, fill to 10.0 m about 20.9 m; 1.09 M m3 each way | cut to 5.6 m, fill to 2.4 m; 41,400 of 77,500 m2 | 5120 s |
+
+All three exit 0 with every building placed; before, Thaanñafu was refused on
+its ground at any budget. Its second rung measured its castles and temple on
+new falls (2562 s); a re-bake with the directory kept does not.
+
+Thaanñafu's easing is the blunt end of the guarantee: 88 % of its 720 m grid
+moves, a million cubic metres each way, for a 282 m site. See "Not yet".
+
+The finished ground against the plan's own walk, in the consumer
+(VoxelGames `tools/probe_city_ground.gd`, Yapoommooloo, 14,279 vertices of
+`walk.navmesh_3d` against the meshed terrain): laid as the finished ground,
+the terrain is off the walk by a median of 0.00 m and 0.38 m at the 95th
+percentile, 8 % of vertices more than 0.25 m off; laid as a level pad per
+building, the old way, a median of 0.29 m, 1.88 m at the 95th percentile and
+55 % of vertices off. What is left is at yard edges beside terrace walls,
+where a 1 m grid ramps a step the mesh drops as a wall: of the 886 vertices
+whose own grid differs from the mesh by more than 0.25 m, 6 are on a road.
+
+### Not yet
+
+* **the pivot** is the mean dry height of the whole grid. A city that sits at
+  one end of its grid is eased about a height that is not its own; easing
+  about the ground under the first plan's site would move less earth;
+* **terrace and retaining walls** are in `lots[].platform.terrace_walls` and
+  in VillageBuilder's mesh, but a road's retaining walls are not in the plan:
+  a consumer that lays `finished` gets the step without the wall;
+* **rivers**: the easing leaves wet nodes alone, so a river in a valley keeps
+  its bed while its banks come down towards it. A caller with running water
+  should check the eased banks against its own water;
+* **BG-018-HILLSIDE-GREAT** would let Thaanñafu stand at a higher `keep`.
 
 ## Visual check (2026-10-28)
 

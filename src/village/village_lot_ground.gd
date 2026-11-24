@@ -266,6 +266,28 @@ static func _measured_parts(job: Dictionary, request: BuildingRequest, fall: flo
 	return {"rects": rects, "rise": rise, "feasible": true, "placement": pl, "outside": flat_r}
 
 
+## What the job's building stands on its platform, in the plan's frame
+## (`BuildingFamilyAdapter.ground_outline` turned by `xf`): the walls at the
+## ground and what stands out of them, which the 3D walk is kept off
+## (BG-015-STREET-PLINTH). Empty when the job kept no building (a measurement
+## read back from a cache file); the walk then falls back to `footprint`.
+static func built_outline(job: Dictionary, xf: Transform3D) -> Array[PackedVector2Array]:
+	var out: Array[PackedVector2Array] = []
+	var building: Variant = job.get("building")
+	if building == null or not building.is_ok():
+		return out
+	var family: BuildingFamilyAdapter = BuildingFamilyAdapter.for_building(building)
+	if family == null:
+		return out
+	for poly in family.ground_outline(building):
+		var world := PackedVector2Array()
+		for p in poly:
+			var w: Vector3 = xf * Vector3(p.x, 0.0, p.y)
+			world.append(Vector2(w.x, w.z))
+		out.append(world)
+	return out
+
+
 ## The graded ground's height at plan point `p` for a building at `xf` on
 ## reading `r`: the platform, less GroundFall's plane below it.
 static func graded_at(r: Dictionary, xf: Transform3D, p: Vector2, g: GroundFall) -> float:

@@ -18,7 +18,9 @@ extends RefCounted
 ##                   request the fall produces is still accepted
 ## (c) walk        on the stair village (Manarola, crossroads): stair streets
 ##                   have treads, lots have a way in, every gate and door is
-##                   on one 3D mesh, and NavigationServer3D reaches every door
+##                   on one 3D mesh, and NavigationServer3D reaches every door;
+##                   and the mesh and its gap links keep gap_clear() off what
+##                   each house and shop built at the ground (BG-015)
 ##   (d) wet         no lot, building, common or road end stands on standing
 ##                   water
 ##   (e) siting      the village says where it stands (anchor, yaw), its
@@ -41,6 +43,8 @@ extends RefCounted
 ##   fall    a house asked for one metre more fall than its family takes
 ##   walk    the same Manarola bake with its access flights removed: doors
 ##           are stranded (VillageStepsWalkSuite._without_access)
+##   clear   the same Manarola baked off `footprint` (the clear floor inside
+##           the walls, as before BG-015): the mesh comes too near
 ##   wet     a lot in lake_shore's southern quarter, below the water level
 ##   cliff   a lot laid across cliff_band's 15 m step
 ##   siting  a frame that turns the site's corners off a grid that only just
@@ -56,6 +60,7 @@ const SYNTH := preload("res://tests/fixtures/terrain/synthetic_terrain.gd")
 const REAL30 := "res://tests/fixtures/terrain/real30/"
 const EXPORTER := preload("res://tools/export_village_plan.gd")
 const STEPS := preload("res://tests/suites/village_steps_walk_suite.gd")
+const CLEARANCE := preload("res://qa/village_walk_clearance.gd")
 const POPULATION := 30
 const SEED := 4242
 const CARRIED_TOL := 0.01
@@ -136,7 +141,7 @@ static func _case(res: SuiteResult, jobs: Array[Dictionary], name: String, form:
 		label, plan_s, plan.site_anchor.x, plan.site_anchor.y, rad_to_deg(plan.site_yaw),
 		plan.site.size.x, plan.site.size.y, plan.buildings.size(), fits, most_fall, worst, why])
 	if name == "real30/manarola" and form == &"crossroads":
-		_walk(res, plan, label)
+		_walk(res, plan, label, jobs)
 
 
 ## (e) the siting rules: where it stands, that it is on the grid, that the
@@ -273,7 +278,7 @@ static func _falls(res: SuiteResult, plan: VillagePlan, label: String) -> void:
 ## village. Every stair street is stepped, every lot has a way in, and
 ## NavigationServer3D walks from the first gate to every door over the baked
 ## 3D mesh and its links.
-static func _walk(res: SuiteResult, plan: VillagePlan, label: String) -> void:
+static func _walk(res: SuiteResult, plan: VillagePlan, label: String, jobs: Array[Dictionary]) -> void:
 	var surface := VillageGroundSurface.of(plan)
 	var stair_streets := 0
 	var treads := 0
@@ -370,6 +375,45 @@ static func _walk(res: SuiteResult, plan: VillagePlan, label: String) -> void:
 	res.note("%s walk: %d stair streets (%d treads), %d access flights, %d entry flights; navmesh %d vertices / %d polygons; doors reached %d/%d, climbed up to %.1f m; projection %.1f s; control: %d doors stranded without access flights" % [
 		label, stair_streets, treads, access, _entry_flights(plan), (m3["vertices"] as PackedVector3Array).size(),
 		(m3["polygons"] as Array).size(), arrived, walk["doors"].size(), climbed, walk_s, control])
+	_clearance(res, plan, label, m3, jobs)
+
+
+## (c) continued, BG-015-STREET-PLINTH: the walk keeps off what each house and
+## shop BUILT at the ground -- no mesh edge and no gap link within
+## VillageWalk3D.gap_clear() of its shell under head height (walls, plinth,
+## foundation, chimney stack, porch), outside its door's approach, and no
+## walk polygon inside its walls (qa/village_walk_clearance.gd builds the
+## shells; it does not read the outline the walk was baked off). Control: the
+## same village baked off the clear floor inside the walls (`footprint`), as
+## the walk was before, must come too near.
+static func _clearance(res: SuiteResult, plan: VillagePlan, label: String, m3: Dictionary,
+		jobs: Array[Dictionary]) -> void:
+	var t0 := Time.get_ticks_msec()
+	var built: Array = CLEARANCE.built(plan, jobs)
+	var clear := VillageWalk3D.gap_clear()
+	var approach := VillageWalk3D.agent_radius() + VillageWalk3D.CELL
+	var r: Dictionary = CLEARANCE.measure(m3, built, clear, approach)
+	var plinths := 0
+	for row in built:
+		plinths += 1 if float(row.get("plinth_m", 0.0)) > 0.05 else 0
+	res.checked += 1
+	if int(r["measured"]) < 1 or plinths < 1:
+		res.fail("%s: clearance -- measured %d buildings (%d with a plinth); the rule sees nothing" % [
+			label, int(r["measured"]), plinths])
+	res.checked += 1
+	if int(r["edges"]) + int(r["links"]) + int(r["inside"]) > 0:
+		res.fail("%s: the 3D walk comes within %.3f m of what a building built: %d pieces of mesh edge, %d of gap link, %d polygons inside walls; worst %s" % [
+			label, clear, int(r["edges"]), int(r["links"]), int(r["inside"]), "; ".join(r["rows"])])
+	var old: Dictionary = VillageWalk3D.bake(plan, {"footprints": true})
+	var c: Dictionary = CLEARANCE.measure(old, built, clear, approach)
+	res.checked += 1
+	if int(c["edges"]) + int(c["links"]) + int(c["inside"]) <= 0:
+		res.fail("%s: clearance control -- baked off the clear floor inside the walls, no edge came within %.3f m of a building; the rule sees nothing" % [
+			label, clear])
+	res.note("%s clearance: %d buildings measured (%d with a plinth, %d skipped), nearest %.3f m (rule %.3f m): %d edge pieces, %d gap-link pieces, %d polygons inside walls | control (footprints): nearest %.3f m, %d edge pieces, %d gap-link pieces, %d inside; %s | %.1f s" % [
+		label, int(r["measured"]), plinths, int(r["skipped"]), float(r["worst_m"]), clear, int(r["edges"]),
+		int(r["links"]), int(r["inside"]), float(c["worst_m"]), int(c["edges"]), int(c["links"]), int(c["inside"]),
+		"; ".join(c["rows"].slice(0, 2)), (Time.get_ticks_msec() - t0) / 1000.0])
 
 
 static func _entry_flights(plan: VillagePlan) -> int:
@@ -389,7 +433,7 @@ static func _mesh(data: Dictionary) -> Dictionary:
 		polygons.append(PackedInt32Array(p))
 	var links: Array = []
 	for l in data.get("links", []):
-		links.append({"from": _v3(l["from_m"]), "to": _v3(l["to_m"])})
+		links.append({"from": _v3(l["from_m"]), "to": _v3(l["to_m"]), "kind": String(l.get("kind", ""))})
 	return {"vertices": verts, "polygons": polygons, "links": links}
 
 
